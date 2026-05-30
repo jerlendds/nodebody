@@ -9,6 +9,14 @@ export default defineConfig({
         find: /^@nodebody\/ui$/,
         replacement: resolve(__dirname, "../ui/src/index.ts"),
       },
+      {
+        find: /^@nodebody\/ui\/index\.css$/,
+        replacement: resolve(__dirname, "../ui/src/index.css"),
+      },
+      {
+        find: /^@nodebody\/ui\/(.*)$/,
+        replacement: resolve(__dirname, "../ui/src/$1"),
+      },
     ],
   },
 });

@@ -1,0 +1,131 @@
+.nb-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--modal-overlay, rgba(5, 7, 12, 0.58));
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: nb-modal-overlay-in 160ms ease-out;
+}
+
+.nb-modal-overlay--closing {
+  pointer-events: none;
+  animation: nb-modal-overlay-out 75ms ease-in forwards;
+}
+
+.nb-modal {
+  width: min(520px, calc(100vw - 48px));
+  max-height: calc(100vh - 128px);
+  overflow: auto;
+  border: 1px solid var(--nb-dark);
+  border-radius: 6px;
+  background: var(--nb-darkest);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.42);
+  animation: nb-modal-in 160ms ease-out;
+  transform-origin: center;
+}
+
+.nb-modal-overlay--closing .nb-modal {
+  animation: nb-modal-out 150ms ease-in forwards;
+}
+
+.nb-modal__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  gap: 16px;
+  align-items: start;
+  padding: 22px 22px 0;
+}
+
+.nb-modal__title {
+  margin: 0;
+  color: var(--nb-foreground);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.nb-modal__close {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--nb-muted);
+}
+
+.nb-modal__close:hover {
+  background: var(--nb-dark);
+  color: var(--nb-bright);
+}
+
+.nb-modal__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.nb-modal__description {
+  margin: 5px 22px 0;
+  color: var(--nb-ink);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.nb-modal__body {
+  padding: 20px;
+}
+
+@keyframes nb-modal-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nb-modal-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes nb-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes nb-modal-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nb-modal-overlay,
+  .nb-modal,
+  .nb-modal-overlay--closing,
+  .nb-modal-overlay--closing .nb-modal {
+    animation-duration: 1ms;
+  }
+}

@@ -58,7 +58,7 @@ export function attachDropdown(
 }
 
 class DropdownControllerImpl implements DropdownController {
-  readonly element = el("div", "nb-dropdown nb-context-menu");
+  readonly element = el("div", "nb-dropdown");
 
   private readonly trigger: HTMLElement;
   private readonly align: "start" | "end";
@@ -254,10 +254,7 @@ function renderItems(items: readonly DropdownItem[]) {
 
   for (const item of items) {
     if (item.type === "separator") {
-      const separator = el(
-        "div",
-        "nb-dropdown__separator nb-context-menu__separator",
-      );
+      const separator = el("div", "nb-dropdown__separator");
       separator.setAttribute("role", "separator");
       list.append(separator);
       continue;
@@ -275,27 +272,19 @@ function renderItems(items: readonly DropdownItem[]) {
 }
 
 function renderAction(item: DropdownActionItem) {
-  const button = el("button", "nb-dropdown__item nb-context-menu__item");
+  const button = el("button", "nb-dropdown__item");
   button.type = "button";
   button.setAttribute("role", "menuitem");
   button.dataset.dropdownItem = item.id;
   button.disabled = item.enabled === false;
   actionDetails.set(button, { id: item.id, item });
 
-  const label = el(
-    "span",
-    "nb-dropdown__label nb-context-menu__label",
-    item.label,
-  );
+  const label = el("span", "nb-dropdown__label", item.label);
   button.append(label);
 
   if (item.accelerator) {
     button.append(
-      el(
-        "span",
-        "nb-dropdown__accelerator nb-context-menu__accelerator",
-        item.accelerator,
-      ),
+      el("span", "nb-dropdown__accelerator", item.accelerator),
     );
   }
 
@@ -306,26 +295,20 @@ function renderSubmenu(item: DropdownSubmenuItem) {
   const wrapper = el("div", "nb-dropdown__submenu-host");
   const button = el(
     "button",
-    "nb-dropdown__item nb-dropdown__item--submenu nb-context-menu__item",
+    "nb-dropdown__item nb-dropdown__item--submenu",
   );
   button.type = "button";
   button.disabled = item.enabled === false;
   button.setAttribute("role", "menuitem");
   button.setAttribute("aria-haspopup", "menu");
 
+  button.append(el("span", "nb-dropdown__label", item.label));
   button.append(
-    el("span", "nb-dropdown__label nb-context-menu__label", item.label),
-  );
-  button.append(
-    el(
-      "span",
-      "nb-dropdown__submenu-arrow nb-context-menu__accelerator",
-      ">",
-    ),
+    el("span", "nb-dropdown__submenu-arrow", ">"),
   );
   wrapper.append(button);
 
-  const submenu = el("div", "nb-dropdown nb-context-menu nb-dropdown__submenu");
+  const submenu = el("div", "nb-dropdown nb-dropdown__submenu");
   submenu.setAttribute("role", "menu");
   submenu.append(renderItems(item.items));
   wrapper.append(submenu);

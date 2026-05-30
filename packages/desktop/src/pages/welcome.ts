@@ -4,22 +4,23 @@ import {
   bulbIcon,
   codeFileIcon,
   cogIcon,
+  createModal,
   el,
+  folderTreeIcon,
   html,
   leafIcon,
   render,
   signingADocumentIcon,
   spaceshipLaunchDocumentationIcon,
 } from "@nodebody/ui";
+import type { TrustedHtml } from "@nodebody/ui";
 
-const starts = [
-  ["Create new space...", spaceshipLaunchDocumentationIcon],
-  ["Open a space...", signingADocumentIcon],
-  ["Open settings...", cogIcon],
-];
-const recent = [
-  ["studies", "~/Projects/studies/"],
-  ["nodebody", "~/Projects/nodebody/"],
+type StartAction = "create-space" | "open-space" | "open-settings";
+
+const starts: [StartAction, string, TrustedHtml][] = [
+  ["create-space", "Create new space...", spaceshipLaunchDocumentationIcon],
+  ["open-space", "Open a space...", signingADocumentIcon],
+  ["open-settings", "Open settings...", cogIcon],
 ];
 
 /// Welcome page shown in the initial workspace tab.
@@ -46,24 +47,132 @@ function createIntro() {
 
   const start = el("div", "nb-welcome__block");
   start.append(el("h2", "", "Start"));
-  for (const [text, icon] of starts) {
+  for (const [action, text, icon] of starts) {
     const btn = el("button", "nb-welcome__link");
-    console.log(btn);
+    btn.type = "button";
+    btn.dataset.action = action;
     render(btn, html`<span>${text}</span> ${icon}`);
     start.append(btn);
   }
+  start.addEventListener("click", (event) => {
+    const button = (event.target as Element).closest<HTMLButtonElement>(
+      "button[data-action]",
+    );
+    if (!button) return;
+    if (button.dataset.action === "create-space") openCreateSpaceModal();
+    if (button.dataset.action === "open-space") void openExistingSpace();
+  });
 
   const list = el("div", "nb-welcome__block");
   list.append(el("h2", "", "Recent"));
-  for (const [name, path] of recent) {
-    const row = el("button", "nb-recent");
-    render(row, html`<span>${name}</span><small>${path}</small>`);
-    list.append(row);
-  }
+  const recentList = el("div", "nb-welcome__recent-list");
+  recentList.append(el("small", "nb-welcome__fact", "No spaces yet."));
+  list.append(recentList);
   list.append(el("button", "nb-welcome__link", "More..."));
+  void refreshRecentSpaces(recentList);
 
   section.append(start, list);
   return section;
+}
+
+function openCreateSpaceModal() {
+  const form = el("form", "nb-space-form");
+  const field = el("label", "nb-space-form__field");
+  const label = el("span", "", "Space selection");
+  const controls = el("div", "nb-space-form__controls");
+  const input = el("input", "nb-space-form__input") as HTMLInputElement;
+  input.type = "text";
+  input.required = true;
+  input.placeholder = "~/Path/to/folder/location/";
+  const browse = el("button", "nb-space-form__browse", "Select folder");
+  browse.type = "button";
+  browse.setAttribute("aria-label", "Select folder");
+  controls.append(input, browse);
+  field.append(label, controls);
+
+  const footer = el("div", "nb-space-form__footer");
+  const status = el("p", "nb-space-form__status");
+  const submit = el("button", "nb-welcome__primary", "Create space");
+  submit.type = "submit";
+  footer.append(status, submit);
+  form.append(field, footer);
+
+  const modal = createModal({
+    title: "Create a new space",
+    description:
+      "Select a folder to create a new malleable space of knowledge. Any files in this folder will be included in your space.",
+    content: form,
+  });
+  document.body.append(modal.element);
+  window.setTimeout(() => input.focus(), 0);
+
+  browse.addEventListener("click", async () => {
+    const directoryPath = await window.os.selectFolder?.();
+    if (directoryPath) input.value = directoryPath;
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const directoryPath = input.value.trim();
+    if (!directoryPath) {
+      status.textContent = "Choose a folder first.";
+      return;
+    }
+
+    submit.disabled = true;
+    status.textContent = "Creating space...";
+    try {
+      await window.spaces.create(directoryPath);
+      modal.close();
+      refreshAllRecentSpaces();
+    } catch (error) {
+      status.textContent =
+        error instanceof Error ? error.message : "Unable to create space.";
+      submit.disabled = false;
+    }
+  });
+}
+
+async function openExistingSpace() {
+  const directoryPath = await window.os.selectFolder?.();
+  if (!directoryPath) return;
+  try {
+    await window.spaces.select(directoryPath);
+    refreshAllRecentSpaces();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function refreshRecentSpaces(root: HTMLElement) {
+  const spaces = await window.spaces.list();
+  root.replaceChildren();
+  if (!spaces.length) {
+    root.append(el("small", "nb-welcome__fact", "No spaces yet."));
+    return;
+  }
+
+  for (const space of spaces) {
+    const row = el("button", "nb-recent");
+    row.type = "button";
+    row.dataset.path = space.path;
+    const name = el("span", "", space.name);
+    const small = el("small", "", space.path);
+    row.append(name, small);
+    row.addEventListener("click", async () => {
+      await window.spaces.select(space.path);
+      refreshAllRecentSpaces();
+    });
+    root.append(row);
+  }
+}
+
+function refreshAllRecentSpaces() {
+  for (const root of document.querySelectorAll<HTMLElement>(
+    ".nb-welcome__recent-list",
+  )) {
+    void refreshRecentSpaces(root);
+  }
 }
 
 function createWalkthroughs() {

@@ -17,6 +17,15 @@ contextBridge.exposeInMainWorld("os", {
   selectFolder: () => ipcRenderer.invoke("os:selectFolder"),
 });
 
+contextBridge.exposeInMainWorld("spaces", {
+  list: () => ipcRenderer.invoke("spaces:list"),
+  selected: () => ipcRenderer.invoke("spaces:selected"),
+  create: (directoryPath: string) =>
+    ipcRenderer.invoke("spaces:create", directoryPath),
+  select: (directoryPath: string) =>
+    ipcRenderer.invoke("spaces:select", directoryPath),
+});
+
 contextBridge.exposeInMainWorld("contextMenu", {
   show(payload: {
     actions: readonly ContextMenuAction[];
