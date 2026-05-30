@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { ContextMenuAction } from "../../ui/src/contextmenu";
+import type { ContextMenuAction } from "@nodebody/ui";
 
 /// custom titlebar bridge
 contextBridge.exposeInMainWorld("win", {

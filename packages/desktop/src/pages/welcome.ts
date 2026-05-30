@@ -3,29 +3,23 @@ import {
   abcIcon,
   bulbIcon,
   codeFileIcon,
+  cogIcon,
   el,
-  folderTreeIcon,
-  graphFolderIcon,
   html,
   leafIcon,
-  pencilSearchIcon,
   render,
-  stopwatchIcon,
-  wordmarkIcon,
+  signingADocumentIcon,
+  spaceshipLaunchDocumentationIcon,
 } from "@nodebody/ui";
 
 const starts = [
-  "Create new space...",
-  "Open a space...",
-  "Connect to a space...",
-  "Open settings...",
+  ["Create new space...", spaceshipLaunchDocumentationIcon],
+  ["Open a space...", signingADocumentIcon],
+  ["Open settings...", cogIcon],
 ];
 const recent = [
-  ["studies", "~/Projects"],
-  ["nodebody", "~/Projects/omoika.space"],
-  ["frontend", "~/Projects"],
-  ["codemirror", "~/Projects"],
-  ["app", "~/Projects/omoika.space"],
+  ["studies", "~/Projects/studies/"],
+  ["nodebody", "~/Projects/nodebody/"],
 ];
 
 /// Welcome page shown in the initial workspace tab.
@@ -47,8 +41,12 @@ function createIntro() {
 
   const start = el("div", "nb-welcome__block");
   start.append(el("h2", "", "Start"));
-  for (const item of starts)
-    start.append(el("button", "nb-welcome__link", item));
+  for (const [text, icon] of starts) {
+    const btn = el("button", "nb-welcome__link");
+    console.log(btn);
+    render(btn, html`<span>${text}</span> ${icon}`);
+    start.append(btn);
+  }
 
   const list = el("div", "nb-welcome__block");
   list.append(el("h2", "", "Recent"));

@@ -1,4 +1,4 @@
-import type { Disposable } from "./base/disposable";
+import type { Disposable } from "../base/disposable";
 
 export type ContextMenuTrigger = "mouse" | "keyboard" | "focus" | "hover";
 
@@ -167,7 +167,7 @@ export class ContextMenuController implements Disposable {
   private onContextMenu(event: Event): void {
     const mouseEvent = event as MouseEvent;
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
 
     const resolved = this.resolveScope(target);
     if (!resolved) return;
@@ -177,7 +177,7 @@ export class ContextMenuController implements Disposable {
 
     void this.show(resolved, {
       trigger: "mouse",
-      target,
+      target: eventTargetElement(target),
       anchor: { x: mouseEvent.clientX, y: mouseEvent.clientY },
       shiftKey: mouseEvent.shiftKey,
       ctrlKey: mouseEvent.ctrlKey,
@@ -193,7 +193,7 @@ export class ContextMenuController implements Disposable {
     if (!opensByKey && !opensByShiftF10) return;
 
     const target = keyEvent.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
 
     const resolved = this.resolveScope(this.focusedElement ?? target);
     if (!resolved) return;
@@ -203,7 +203,7 @@ export class ContextMenuController implements Disposable {
 
     void this.show(resolved, {
       trigger: "keyboard",
-      target,
+      target: eventTargetElement(target),
       anchor: anchorForElement(resolved.element),
       shiftKey: keyEvent.shiftKey,
       ctrlKey: keyEvent.ctrlKey,
@@ -215,7 +215,7 @@ export class ContextMenuController implements Disposable {
   private onPointerOver(event: Event): void {
     const pointerEvent = event as PointerEvent;
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
 
     const resolved = this.resolveScope(target);
     if (!resolved) return;
@@ -227,7 +227,7 @@ export class ContextMenuController implements Disposable {
 
       void this.show(resolved, {
         trigger: "hover",
-        target,
+        target: eventTargetElement(target),
         anchor: anchorForElement(resolved.element),
         shiftKey: pointerEvent.shiftKey,
         ctrlKey: pointerEvent.ctrlKey,
@@ -239,7 +239,7 @@ export class ContextMenuController implements Disposable {
 
   private onPointerOut(event: Event): void {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
 
     const resolved = this.resolveScope(target);
     if (resolved && this.hoveredElement === resolved.element) {
@@ -250,14 +250,14 @@ export class ContextMenuController implements Disposable {
 
   private onFocusIn(event: Event): void {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
 
     this.focusedElement = this.resolveScope(target)?.element;
   }
 
   private onFocusOut(event: Event): void {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
 
     const resolved = this.resolveScope(target);
     if (resolved && this.focusedElement === resolved.element) {
@@ -297,12 +297,14 @@ export class ContextMenuController implements Disposable {
     await scope.runAction(action.id, menuEvent);
   }
 
-  private resolveScope(start: HTMLElement): RegisteredScope | undefined {
-    let node: HTMLElement | null = start;
+  private resolveScope(start: Element): RegisteredScope | undefined {
+    let node: Element | null = start;
 
     while (node) {
-      const scope = this.scopes.get(node);
-      if (scope) return { element: node, scope };
+      if (node instanceof HTMLElement) {
+        const scope = this.scopes.get(node);
+        if (scope) return { element: node, scope };
+      }
 
       if (node.parentElement) {
         node = node.parentElement;
@@ -331,6 +333,18 @@ export class ContextMenuController implements Disposable {
 export function anchorForElement(element: HTMLElement): ContextMenuAnchor {
   const rect = element.getBoundingClientRect();
   return { x: rect.left, y: rect.bottom };
+}
+
+function eventTargetElement(target: Element): HTMLElement {
+  if (target instanceof HTMLElement) return target;
+
+  let node: Element | null = target;
+  while (node) {
+    if (node instanceof HTMLElement) return node;
+    node = node.parentElement;
+  }
+
+  return document.documentElement;
 }
 
 let globalContextMenuController: ContextMenuController | undefined;

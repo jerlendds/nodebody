@@ -48,7 +48,7 @@
   background: transparent;
   color: var(--nb-accent);
   text-align: left;
-  transition: color 100ms cubic-bezier(0.4, 0, 1, 1);
+  transition: color 75ms linear;
 }
 
 .nb-welcome__link:hover,
@@ -56,6 +56,16 @@
 .nb-recent:hover,
 .nb-walkthrough:hover {
   color: var(--nb-accent-soft);
+}
+.nb-welcome__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nb-welcome__link svg {
+  height: 16px;
+  width: 16px;
+  margin-right: 7px;
 }
 
 .nb-welcome-ingest {
