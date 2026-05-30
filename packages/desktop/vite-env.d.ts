@@ -24,6 +24,7 @@ interface OsApi {
 interface Space {
   name: string;
   path: string;
+  displayPath: string;
 }
 
 interface SpacesApi {

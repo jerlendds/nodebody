@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { app } from "electron";
 
@@ -76,6 +77,19 @@ export async function selectSpace(directoryPath: string): Promise<Space> {
   };
   await saveSpace(space);
   return space;
+}
+
+export function formatHomePathForDisplay(filePath: string) {
+  const home = path.resolve(os.homedir());
+  const resolved = path.resolve(filePath);
+  const relative = path.relative(home, resolved);
+
+  if (!relative) return "~";
+  if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
+    return `~${path.sep}${relative}`;
+  }
+
+  return filePath;
 }
 
 async function saveSpace(space: Space) {

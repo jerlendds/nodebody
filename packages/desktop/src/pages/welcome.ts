@@ -156,8 +156,8 @@ async function refreshRecentSpaces(root: HTMLElement) {
     const row = el("button", "nb-recent");
     row.type = "button";
     row.dataset.path = space.path;
-    const name = el("span", "", space.name);
-    const small = el("small", "", space.path);
+    const name = el("span", "nb-recent__name", space.name);
+    const small = el("small", "nb-recent__path", displaySpacePath(space));
     row.append(name, small);
     row.addEventListener("click", async () => {
       await window.spaces.select(space.path);
@@ -165,6 +165,25 @@ async function refreshRecentSpaces(root: HTMLElement) {
     });
     root.append(row);
   }
+}
+
+function displaySpacePath(space: Space) {
+  return space.displayPath || formatHomePathFallback(space.path);
+}
+
+function formatHomePathFallback(filePath: string) {
+  const normalized = filePath.split("\\").join("/");
+  const unixHome = normalized.match(/^\/(?:home|Users)\/[^/]+(?:\/(.*))?$/);
+  if (unixHome) return unixHome[1] ? `~/${unixHome[1]}` : "~";
+
+  const windowsHome = filePath.match(
+    /^[A-Za-z]:[\\/]+Users[\\/]+[^\\/]+(?:[\\/]+(.*))?$/i,
+  );
+  if (windowsHome) {
+    return windowsHome[1] ? `~\\${windowsHome[1]}` : "~";
+  }
+
+  return filePath;
 }
 
 function refreshAllRecentSpaces() {
