@@ -6,6 +6,7 @@ export * from "./components/types";
 export * from "./components/icons";
 export * from "./components/tooltip";
 export * from "./components/contextmenu";
+export * from "./components/dropdown";
 export * from "./base/animation";
 export * from "./base/component";
 export * from "./base/disposable";

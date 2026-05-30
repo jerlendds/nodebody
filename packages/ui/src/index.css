@@ -1,5 +1,6 @@
 @import "./styles/pane.css";
 @import "./styles/tooltip.css";
+@import "./styles/dropdown.css";
 
 .nb-iframe-view {
   display: block;
