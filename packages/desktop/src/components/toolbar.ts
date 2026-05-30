@@ -1,6 +1,8 @@
 import { el } from "../../../ui/src/base/dom";
 import type { Scope } from "../../../ui/src/base/disposable";
+import { disposable } from "../../../ui/src/base/disposable";
 import { html, render, type TrustedHtml } from "../../../ui/src/base/html";
+import { getHotkeyManager } from "../../../ui/src/base/hotkeys";
 import {
   arrowNarrowLeftIcon,
   arrowNarrowRightIcon,
@@ -60,6 +62,7 @@ const brandTooltipPhrases = [
 /// Buttons expose data attributes only; command wiring lives outside.
 export function createToolbar(scope: Scope) {
   const root = el("header", "nb-toolbar");
+  const left = el("div", "nb-toolbar__left");
   const brand = el("div", "nb-toolbar__brand");
   brand.setAttribute("aria-label", "Nodebody");
   brand.tabIndex = 0;
@@ -82,6 +85,19 @@ export function createToolbar(scope: Scope) {
     scope,
     { placement: "bottom" },
   );
+  const titlebarMenu = el("nav", "nb-toolbar__titlebar");
+  titlebarMenu.setAttribute("aria-label", "Application menu");
+  titlebarMenu.setAttribute("aria-hidden", "true");
+  titlebarMenu.hidden = true;
+
+  const menuItems = ["File", "Edit", "View", "Help"] as const;
+  for (const label of menuItems) {
+    const button = el("button", "nb-toolbar__titlebar-item", label);
+    button.type = "button";
+    button.dataset.titlebarFunction = label.toLowerCase();
+    titlebarMenu.append(button);
+  }
+
   const center = el("div", "nb-toolbar__center");
 
   const history = el("div", "nb-toolbar__history");
@@ -132,6 +148,37 @@ export function createToolbar(scope: Scope) {
     actions.append(button);
   }
 
-  root.append(brand, center, actions);
+  const setTitlebarMenuOpen = (open: boolean) => {
+    titlebarMenu.hidden = !open;
+    titlebarMenu.setAttribute("aria-hidden", String(!open));
+    root.classList.toggle("nb-toolbar--titlebar-open", open);
+  };
+
+  scope.add(
+    getHotkeyManager().registerGlobal({
+      id: "workbench.titlebarMenu.show",
+      key: "Alt",
+      priority: 1_000,
+      allowInEditable: true,
+      run: () => {
+        setTitlebarMenuOpen(true);
+      },
+    }),
+  );
+
+  const onDocumentPointerDown = (event: PointerEvent) => {
+    const path = event.composedPath();
+    if (path.includes(root)) return;
+    setTitlebarMenuOpen(false);
+  };
+  document.addEventListener("pointerdown", onDocumentPointerDown, true);
+  scope.add(
+    disposable(() => {
+      document.removeEventListener("pointerdown", onDocumentPointerDown, true);
+    }),
+  );
+
+  left.append(brand, titlebarMenu);
+  root.append(left, center, actions);
   return root;
 }

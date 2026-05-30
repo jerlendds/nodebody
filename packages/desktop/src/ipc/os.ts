@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, OpenDialogOptions } from "electron";
 
-export function registerShellIpc() {
+export function registerOsIpc() {
   ipcMain.handle("os:selectFolder", async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     const options = {

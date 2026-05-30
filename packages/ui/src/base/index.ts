@@ -4,6 +4,7 @@ export * from "./disposable";
 export * from "./dom";
 export * from "./events";
 export * from "./html";
+export * from "./hotkeys";
 export * from "./network";
 export * from "./platform";
 export * from "./router";

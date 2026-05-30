@@ -1,7 +1,7 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import started from "electron-squirrel-startup";
-
+import registerIpcHandlers from "./ipc/index";
 // handle creating/removing shortcuts on install/uninstall (Windows)
 if (started) {
   app.quit();
@@ -44,6 +44,9 @@ ipcMain.on("window:close", (event) => {
 
 // some APIs can only be used after this event occurs
 app.on("ready", createWindow);
+
+// register all ipc handlers at packages/desktop/src/ipc/
+registerIpcHandlers();
 
 // quit when all windows are closed (except macOS)
 app.on("window-all-closed", () => {

@@ -11,9 +11,17 @@
   -webkit-app-region: drag;
 }
 
+.nb-toolbar__left {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
 .nb-toolbar__brand {
   position: relative;
-  justify-self: start;
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
   width: 24px;
@@ -21,6 +29,39 @@
   color: var(--nb-muted);
   line-height: 0;
   -webkit-app-region: no-drag;
+}
+
+.nb-toolbar__titlebar {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 1px;
+  -webkit-app-region: no-drag;
+}
+
+.nb-toolbar__titlebar[hidden] {
+  display: none;
+}
+
+.nb-toolbar__titlebar-item {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--nb-muted);
+  cursor: default;
+  font: inherit;
+  font-size: 12px;
+  line-height: 24px;
+  -webkit-app-region: no-drag;
+}
+
+.nb-toolbar__titlebar-item:hover,
+.nb-toolbar__titlebar-item:focus-visible {
+  background: var(--nb-darkest);
+  color: var(--nb-bright);
+  outline: 0;
 }
 
 .nb-toolbar__brand-icon {
@@ -102,8 +143,8 @@
 }
 
 .nb-tool-button:hover {
-  background: #242636;
-  color: var(--nb-accent);
+  background: var(--nb-darkest);
+  color: var(--nb-accent-soft);
 }
 
 .nb-tool-button svg {

@@ -4,15 +4,16 @@ import {
   signal,
   mount,
   delegate,
-  statusBar,
-  createToolbar,
   createPaneGroup,
+  getContextMenuManager,
   graphFolderIcon,
   applyComponentTheme,
 } from "@nodebody/ui";
 import { welcomeView } from "../pages/welcome";
 import type { ActivityItem, SidebarSide } from "./sidebar";
 import { createSidebar } from "./sidebar";
+import { createToolbar } from "./toolbar";
+import { statusBar } from "./statusbar";
 
 /// Options used to assemble the default workbench shell.
 export interface WorkbenchOptions {
@@ -83,15 +84,15 @@ export function workbench(options: WorkbenchOptions = {}): Component {
         panes.subscribe(() => {
           paneScope.dispose();
           paneScope = scope.add(new Scope());
-          paneMount.replaceChildren(
-            createPaneGroup(panes.get(), paneScope, {
-              addTab: (paneId) => panes.set(addEmptyTab(panes.get(), paneId)),
-              activateTab: (paneId, tabId) =>
-                panes.set(activateTab(panes.get(), paneId, tabId)),
-              closeTab: (paneId, tabId) =>
-                panes.set(closeTab(panes.get(), paneId, tabId)),
-            }),
-          );
+          const paneGroup = createPaneGroup(panes.get(), paneScope, {
+            addTab: (paneId) => panes.set(addEmptyTab(panes.get(), paneId)),
+            activateTab: (paneId, tabId) =>
+              panes.set(activateTab(panes.get(), paneId, tabId)),
+            closeTab: (paneId, tabId) =>
+              panes.set(closeTab(panes.get(), paneId, tabId)),
+          });
+          paneMount.replaceChildren(paneGroup);
+          registerPaneSurfaceContextMenus(paneGroup, paneScope);
         }),
       );
 
@@ -124,6 +125,61 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       );
     },
   };
+}
+
+function registerPaneSurfaceContextMenus(root: ParentNode, scope: Scope) {
+  const manager = getContextMenuManager();
+  for (const surface of root.querySelectorAll<HTMLElement>(
+    ".nb-pane__surface",
+  )) {
+    scope.add(
+      manager.register(surface, {
+        getActions() {
+          const hasSelection = selectedTextIn(surface).length > 0;
+          return [
+            {
+              id: "copy",
+              label: "Copy",
+              accelerator: navigator.platform.includes("Mac")
+                ? "Cmd+C"
+                : "Ctrl+C",
+              enabled: hasSelection,
+            },
+          ];
+        },
+
+        async runAction(actionId) {
+          if (actionId !== "copy") return;
+          const text = selectedTextIn(surface);
+          if (!text) return;
+          await copyText(text);
+        },
+      }),
+    );
+  }
+}
+
+function selectedTextIn(element: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed) return "";
+
+  const text = selection.toString();
+  if (!text) return "";
+
+  for (let i = 0; i < selection.rangeCount; i += 1) {
+    const range = selection.getRangeAt(i);
+    if (range.intersectsNode(element)) return text;
+  }
+
+  return "";
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    document.execCommand("copy");
+  }
 }
 
 function clonePanes(panes: PaneModel[]) {

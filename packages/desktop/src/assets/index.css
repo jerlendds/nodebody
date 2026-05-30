@@ -3,9 +3,10 @@
 @import "statusbar.css";
 @import "tabbar.css";
 @import "toolbar.css";
+@import "context-menu.css";
 @import "welcome.css";
 
-.nb-workbench {
+:root {
   --nb-toolbar-height: 32px;
   --nb-tab-height: 28px;
   --nb-statusbar-height: 22px;
@@ -24,11 +25,13 @@
   --nb-muted: #747891;
   --nb-subtle: #525468;
   --nb-dim: #242633;
-  --nb-dark: #181a25;
+  --nb-dark: #13151d;
   --nb-darkest: #101118;
   --nb-accent: #2a84f8;
   --nb-accent-soft: #0074f8;
+}
 
+.nb-workbench {
   display: grid;
   grid-template:
     "toolbar toolbar" var(--nb-toolbar-height)

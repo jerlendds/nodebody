@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { ContextMenuAction } from "../../ui/src/contextmenu";
 
 /// custom titlebar bridge
 contextBridge.exposeInMainWorld("win", {
@@ -14,4 +15,14 @@ contextBridge.exposeInMainWorld("versions", {
 
 contextBridge.exposeInMainWorld("os", {
   selectFolder: () => ipcRenderer.invoke("os:selectFolder"),
+});
+
+contextBridge.exposeInMainWorld("contextMenu", {
+  show(payload: {
+    actions: readonly ContextMenuAction[];
+    x: number;
+    y: number;
+  }) {
+    return ipcRenderer.invoke("context-menu:show", payload);
+  },
 });
