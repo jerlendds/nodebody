@@ -33,8 +33,8 @@ export interface WorkbenchOptions {
 
 const defaultActivities = [
   {
-    id: "home",
-    label: "Home",
+    id: "xplorer",
+    label: "Xplorer",
     icon: graphFolderIcon,
     tooltip: "Xplorer",
   },
@@ -124,7 +124,10 @@ export function workbench(options: WorkbenchOptions = {}): Component {
         const detail = (event as CustomEvent<DropdownSelectEventDetail>).detail;
         if (detail?.id === "file.exit") closeWindow();
       };
-      root.addEventListener("dropdown:select", onDropdownSelect as EventListener);
+      root.addEventListener(
+        "dropdown:select",
+        onDropdownSelect as EventListener,
+      );
       scope.add(
         disposable(() => {
           root.removeEventListener(
