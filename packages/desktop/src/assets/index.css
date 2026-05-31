@@ -15,10 +15,11 @@
   --nb-xplorer-width: 244px;
   --nb-background: #11131d;
   --nb-surface: #141622;
+  --nb-active-tab: #141622;
   --nb-toolbar: #0f111a;
   --nb-sidebar: #0f111a;
   --nb-tabbar: #0f111a;
-  --nb-active-tab: #141622;
+  --nb-xplorer: #0f111a;
   --nb-statusbar: #0f111a;
   --nb-border: #0a0c13;
   --nb-bright: #bec3e0;

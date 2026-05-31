@@ -190,6 +190,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     item.setAttribute("role", "none");
 
     const row = el("button", `nb-xplorer__row nb-xplorer__row--${node.kind}`);
+    if (depth > 0) row.classList.add("nb-xplorer__row--nested");
     row.type = "button";
     row.draggable = true;
     row.dataset.xplorerRow = node.id;
@@ -204,10 +205,12 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       row.setAttribute("aria-expanded", String(expanded.has(node.id)));
     }
 
-    const disclosure = el("span", "nb-xplorer__disclosure");
-    if (node.kind === "folder") render(disclosure, chevronRightIcon);
-
-    row.append(disclosure, el("span", "nb-xplorer__label", node.name));
+    if (node.kind === "folder") {
+      const disclosure = el("span", "nb-xplorer__disclosure");
+      render(disclosure, chevronRightIcon);
+      row.append(disclosure);
+    }
+    row.append(el("span", "nb-xplorer__label", node.name));
     item.append(row);
 
     if (node.kind === "folder" && expanded.has(node.id)) {
