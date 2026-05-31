@@ -30,7 +30,7 @@ import {
   syntaxHighlighting,
 } from "@codemirror/language";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { EditorState, type Extension } from "@codemirror/state";
+import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
 import {
   crosshairCursor,
   drawSelection,
@@ -49,6 +49,7 @@ import {
   toggleStrong,
   toggleTaskListItem,
 } from "./commands";
+import { transformPastedMarkdownText } from "./clipboard";
 import type { MarkdownMode, MarkdownOptions } from "./options";
 import type { MarkdownEditorHost } from "./plugin";
 import { markdownWysiwym } from "./wysiwym";
@@ -115,6 +116,28 @@ export function markdownEditorExtensions(
     ]),
 
     EditorView.lineWrapping,
+
+    EditorView.domEventHandlers({
+      paste(event, view) {
+        const text = event.clipboardData?.getData("text/plain");
+        if (!text) return false;
+
+        const transformed = transformPastedMarkdownText(text);
+        if (transformed === text) return false;
+
+        event.preventDefault();
+
+        view.dispatch(
+          view.state.changeByRange((range) => ({
+            changes: { from: range.from, to: range.to, insert: transformed },
+            range: EditorSelection.cursor(range.from + transformed.length),
+          })),
+          { scrollIntoView: true },
+        );
+
+        return true;
+      },
+    }),
 
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
@@ -191,10 +214,16 @@ function markdownHighlightStyle(): HighlightStyle {
   return HighlightStyle.define([
     { tag: tags.keyword, color: "#8fb6ff" },
     { tag: [tags.atom, tags.bool, tags.number], color: "#f0b46a" },
-    { tag: [tags.string, tags.special(tags.string)], color: "#8ecf93" },
+    {
+      tag: [tags.string, tags.special(tags.string)],
+      color: "var(--nb-foreground)",
+    },
     { tag: [tags.comment, tags.quote], color: "var(--nb-muted)" },
     { tag: [tags.variableName, tags.propertyName], color: "#c8d0f0" },
-    { tag: [tags.definition(tags.variableName), tags.function(tags.variableName)], color: "#79c7ff" },
+    {
+      tag: [tags.definition(tags.variableName), tags.function(tags.variableName)],
+      color: "#79c7ff",
+    },
     { tag: [tags.typeName, tags.className], color: "#c5a3ff" },
     { tag: tags.operator, color: "#aeb6d6" },
     { tag: [tags.punctuation, tags.bracket], color: "#7f849d" },

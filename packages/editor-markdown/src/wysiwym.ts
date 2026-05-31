@@ -8,6 +8,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
+import { transformPastedMarkdownText } from "./clipboard";
 
 export interface WysiwymOptions {
   hideSyntaxOnInactiveLines: boolean;
@@ -20,6 +21,9 @@ const defaultOptions: WysiwymOptions = {
   renderTaskCheckboxes: true,
   revealSyntaxOnSelection: true,
 };
+
+const tableMinColumnWidth = 60;
+const tableColumnWidths = new WeakMap<EditorView, Map<number, number[]>>();
 
 export function markdownWysiwym(
   options: Partial<WysiwymOptions> = {},
@@ -91,11 +95,14 @@ function decorateVisibleLines(
     while (line.from <= visible.to) {
       const text = line.text;
       const active = activeLines.has(line.number);
-      const tableRow = !active ? parseTableRow(text) : undefined;
+      const tableRow = parseRenderableTableRow(view, line.number);
+      const footnote = !active ? parseFootnoteDefinition(text) : undefined;
 
-      decorateLineClass(line.from, text, active, ranges);
+      decorateLineClass(line.from, text, active, tableRow, ranges);
 
-      if (tableRow) {
+      if (footnote) {
+        decorateRenderedFootnote(line.from, line.to, footnote, ranges);
+      } else if (tableRow) {
         if (tableRow.separator) {
           decorateCollapsedTableSeparator(line.from, line.to, ranges);
         } else {
@@ -121,6 +128,7 @@ function decorateLineClass(
   lineFrom: number,
   text: string,
   active: boolean,
+  tableRow: TableRowRenderModel | undefined,
   ranges: Range<Decoration>[],
 ): void {
   const heading = /^(#{1,6})(?:\s+|$)/.exec(text);
@@ -160,15 +168,16 @@ function decorateLineClass(
   }
 
   if (/^\s*\|.+\|\s*$/.test(text)) {
-    const tableRow = !active ? parseTableRow(text) : undefined;
     ranges.push(
       Decoration.line({
         class:
           tableRow?.separator === true
             ? "cm-nb-md-line cm-nb-md-table cm-nb-md-table-separator-rendered"
-            : active
-              ? "cm-nb-md-line cm-nb-md-table cm-nb-md-table-source"
-              : "cm-nb-md-line cm-nb-md-table cm-nb-md-table-rendered",
+            : tableRow
+              ? "cm-nb-md-line cm-nb-md-table cm-nb-md-table-rendered"
+              : active
+                ? "cm-nb-md-line cm-nb-md-table cm-nb-md-table-source"
+                : "cm-nb-md-line cm-nb-md-table",
       }).range(lineFrom),
     );
   }
@@ -250,6 +259,35 @@ function decorateRenderedBlocks(
   decorateHorizontalRule(lineFrom, text, ranges);
 }
 
+interface FootnoteRenderModel {
+  id: string;
+  body: string;
+}
+
+function parseFootnoteDefinition(text: string): FootnoteRenderModel | undefined {
+  const match = /^\s*\[\^([^\]\n]+)\]:\s*(.+?)\s*$/.exec(text);
+  if (!match) return undefined;
+
+  return {
+    id: match[1],
+    body: match[2],
+  };
+}
+
+function decorateRenderedFootnote(
+  lineFrom: number,
+  lineTo: number,
+  footnote: FootnoteRenderModel,
+  ranges: Range<Decoration>[],
+): void {
+  ranges.push(
+    Decoration.replace({
+      widget: new FootnoteDefinitionWidget(footnote),
+      inclusive: false,
+    }).range(lineFrom, Math.max(lineFrom, lineTo)),
+  );
+}
+
 function decorateQuoteBars(
   lineFrom: number,
   text: string,
@@ -274,6 +312,7 @@ function countQuoteLevel(markers: string): number {
 interface TableRowRenderModel {
   cells: string[];
   separator: boolean;
+  tableStartLine: number;
 }
 
 function decorateRenderedTableRow(
@@ -284,7 +323,12 @@ function decorateRenderedTableRow(
 ): void {
   ranges.push(
     Decoration.replace({
-      widget: new TableRowWidget(row.cells, row.separator, lineFrom),
+      widget: new TableRowWidget(
+        row.cells,
+        row.separator,
+        lineFrom,
+        row.tableStartLine,
+      ),
       inclusive: false,
     }).range(lineFrom, Math.max(lineFrom, lineTo)),
   );
@@ -312,7 +356,41 @@ function parseTableRow(text: string): TableRowRenderModel | undefined {
   return {
     cells,
     separator: cells.every(isTableSeparatorCell),
+    tableStartLine: 0,
   };
+}
+
+function parseRenderableTableRow(
+  view: EditorView,
+  lineNumber: number,
+): TableRowRenderModel | undefined {
+  const tableStartLine = completeTableStartLine(view, lineNumber);
+  if (tableStartLine == null) return undefined;
+
+  const row = parseTableRow(view.state.doc.line(lineNumber).text);
+  if (!row) return undefined;
+
+  return { ...row, tableStartLine };
+}
+
+function completeTableStartLine(
+  view: EditorView,
+  lineNumber: number,
+): number | undefined {
+  const doc = view.state.doc;
+  if (lineNumber < 1 || lineNumber > doc.lines) return undefined;
+
+  let first = lineNumber;
+  while (first > 1 && isTableRow(doc.line(first - 1).text)) {
+    first -= 1;
+  }
+
+  if (first + 1 > doc.lines) return false;
+
+  const header = parseTableRow(doc.line(first).text);
+  const separator = parseTableRow(doc.line(first + 1).text);
+
+  return header && separator?.separator ? first : undefined;
 }
 
 function splitTableCells(text: string): string[] {
@@ -563,6 +641,7 @@ class TableRowWidget extends WidgetType {
     private readonly cells: readonly string[],
     private readonly separator: boolean,
     private readonly lineFrom: number,
+    private readonly tableStartLine: number,
   ) {
     super();
   }
@@ -571,6 +650,7 @@ class TableRowWidget extends WidgetType {
     return (
       other.separator === this.separator &&
       other.lineFrom === this.lineFrom &&
+      other.tableStartLine === this.tableStartLine &&
       other.cells.length === this.cells.length &&
       other.cells.every((cell, index) => cell === this.cells[index])
     );
@@ -583,8 +663,26 @@ class TableRowWidget extends WidgetType {
       this.cells.length,
       6,
     )}${this.separator ? " cm-nb-md-table-separator-row" : ""}`;
-    row.style.gridTemplateColumns = tableGridTemplate(this.cells.length);
+    row.style.gridTemplateColumns = tableGridTemplate(
+      view,
+      this.tableStartLine,
+      this.cells.length,
+    );
     row.dataset.tableLine = String(lineNumber);
+    row.dataset.tableStartLine = String(this.tableStartLine);
+
+    const dragHandle = document.createElement("span");
+    dragHandle.className = "cm-nb-md-table-row-drag";
+    dragHandle.contentEditable = "false";
+    dragHandle.setAttribute("aria-hidden", "true");
+    dragHandle.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const activeCell = activeTableCell();
+      if (activeCell) commitTableCellElement(view, activeCell);
+      startTableRowDrag(view, row, lineNumber, this.tableStartLine, event);
+    });
+    row.append(dragHandle);
 
     for (const [index, text] of this.cells.entries()) {
       const cell = document.createElement("span");
@@ -593,30 +691,90 @@ class TableRowWidget extends WidgetType {
       cell.spellcheck = true;
       cell.dataset.tableLine = String(lineNumber);
       cell.dataset.tableCell = String(index);
-      cell.textContent = this.separator ? "" : text;
+      cell.dataset.raw = this.separator ? "" : text;
+      cell.dataset.editing = "false";
+      renderTableCellDisplay(cell);
       cell.setAttribute("role", "textbox");
       cell.setAttribute("aria-label", `Table cell ${index + 1}`);
+      if (index < this.cells.length - 1) {
+        const resizeHandle = document.createElement("span");
+        resizeHandle.className = "cm-nb-md-table-resize";
+        resizeHandle.contentEditable = "false";
+        resizeHandle.setAttribute("aria-hidden", "true");
+        resizeHandle.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          commitTableCellElement(view, cell);
+          startTableColumnResize(
+            view,
+            row,
+            this.tableStartLine,
+            index,
+            event,
+          );
+        });
+        cell.append(resizeHandle);
+      }
+      cell.addEventListener("focus", () => {
+        showRawTableCellSyntax(cell);
+      });
       cell.addEventListener("mousedown", (event) => {
+        const activeCell = activeTableCell();
+        if (activeCell && activeCell !== cell) {
+          event.preventDefault();
+          event.stopPropagation();
+          commitTableCellElement(view, activeCell);
+          focusRenderedTableCell(view, lineNumber, index);
+          return;
+        }
+
         event.stopPropagation();
       });
       cell.addEventListener("click", (event) => {
         event.stopPropagation();
       });
+      cell.addEventListener("copy", (event) => {
+        event.stopPropagation();
+      });
+      cell.addEventListener("cut", (event) => {
+        event.stopPropagation();
+        queueTableCellRawSync(cell);
+      });
+      cell.addEventListener("input", () => {
+        syncTableCellRaw(cell);
+      });
       cell.addEventListener("blur", () => {
-        commitTableCell(view, this.lineFrom, index, cell.textContent ?? "");
+        syncTableCellRaw(cell);
+        commitTableCellElement(view, cell);
+        renderTableCellDisplay(cell);
       });
       cell.addEventListener("keydown", (event) => {
+        event.stopPropagation();
+
         if (event.key === "Enter") {
           event.preventDefault();
-          cell.blur();
+          syncTableCellRaw(cell);
+          commitTableCellElement(view, cell);
           return;
         }
 
         if (event.key !== "Tab") return;
 
         event.preventDefault();
-        commitTableCell(view, this.lineFrom, index, cell.textContent ?? "");
-        moveTableCellFocus(view, this.lineFrom, index, event.shiftKey);
+        syncTableCellRaw(cell);
+        commitTableCellElement(view, cell);
+        moveTableCellFocus(view, lineNumber, index, event.shiftKey);
+      });
+      cell.addEventListener("paste", (event) => {
+        event.stopPropagation();
+
+        const text = event.clipboardData?.getData("text/plain");
+        if (!text) return;
+
+        const transformed = transformPastedMarkdownText(text);
+        event.preventDefault();
+        insertTextIntoEditableCell(transformed);
+        syncTableCellRaw(cell);
       });
       row.append(cell);
     }
@@ -629,20 +787,248 @@ class TableRowWidget extends WidgetType {
   }
 }
 
-function tableGridTemplate(columns: number): string {
+function tableGridTemplate(
+  view: EditorView,
+  tableStartLine: number,
+  columns: number,
+): string {
+  const widths = tableColumnWidths.get(view)?.get(tableStartLine);
+  if (widths?.length === columns) {
+    return widths
+      .map((width) => `${Math.max(tableMinColumnWidth, width)}px`)
+      .join(" ");
+  }
+
   if (columns <= 1) return "minmax(0, 1fr)";
   if (columns === 2) return "repeat(2, minmax(0, 1fr))";
 
   return `minmax(7.5rem, 0.55fr) repeat(${columns - 1}, minmax(0, 1.45fr))`;
 }
 
+function startTableColumnResize(
+  view: EditorView,
+  row: HTMLElement,
+  tableStartLine: number,
+  columnIndex: number,
+  event: MouseEvent,
+): void {
+  const cells = [...row.querySelectorAll<HTMLElement>(".cm-nb-md-table-cell")];
+  const left = cells[columnIndex];
+  const right = cells[columnIndex + 1];
+  if (!left || !right) return;
+
+  const startX = event.clientX;
+  const startWidths = cells.map((cell) => cell.getBoundingClientRect().width);
+  const leftStart = startWidths[columnIndex];
+  const rightStart = startWidths[columnIndex + 1];
+  const pairWidth = leftStart + rightStart;
+  const minWidth = tableMinColumnWidth;
+  if (pairWidth < minWidth * 2) return;
+
+  document.body.classList.add("nb-md-table-resizing");
+
+  const onMove = (moveEvent: MouseEvent) => {
+    const delta = moveEvent.clientX - startX;
+    const leftWidth = clamp(leftStart + delta, minWidth, pairWidth - minWidth);
+    const rightWidth = pairWidth - leftWidth;
+    const widths = startWidths.slice();
+    widths[columnIndex] = leftWidth;
+    widths[columnIndex + 1] = rightWidth;
+    setTableColumnWidths(view, tableStartLine, widths);
+  };
+
+  const onUp = () => {
+    document.body.classList.remove("nb-md-table-resizing");
+    window.removeEventListener("mousemove", onMove, true);
+    window.removeEventListener("mouseup", onUp, true);
+  };
+
+  window.addEventListener("mousemove", onMove, true);
+  window.addEventListener("mouseup", onUp, true);
+}
+
+function setTableColumnWidths(
+  view: EditorView,
+  tableStartLine: number,
+  widths: readonly number[],
+): void {
+  let editorTables = tableColumnWidths.get(view);
+  if (!editorTables) {
+    editorTables = new Map();
+    tableColumnWidths.set(view, editorTables);
+  }
+
+  editorTables.set(tableStartLine, [...widths]);
+
+  const template = widths
+    .map((width) => `${Math.max(tableMinColumnWidth, width)}px`)
+    .join(" ");
+  for (const row of view.dom.querySelectorAll<HTMLElement>(
+    `.cm-nb-md-table-row[data-table-start-line="${tableStartLine}"]`,
+  )) {
+    row.style.gridTemplateColumns = template;
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+interface TableRowDropTarget {
+  lineNumber: number;
+  placement: "before" | "after";
+  row: HTMLElement;
+}
+
+function startTableRowDrag(
+  view: EditorView,
+  row: HTMLElement,
+  lineNumber: number,
+  tableStartLine: number,
+  event: MouseEvent,
+): void {
+  const indicator = tableDropIndicator();
+  let target: TableRowDropTarget | undefined;
+
+  row.classList.add("is-dragging");
+  document.body.classList.add("nb-md-table-row-dragging");
+
+  const onMove = (moveEvent: MouseEvent) => {
+    target = tableRowDropTargetAtPoint(
+      view,
+      tableStartLine,
+      lineNumber,
+      moveEvent.clientX,
+      moveEvent.clientY,
+    );
+
+    if (!target) {
+      indicator.hidden = true;
+      return;
+    }
+
+    positionTableDropIndicator(indicator, target);
+  };
+
+  const onUp = () => {
+    row.classList.remove("is-dragging");
+    document.body.classList.remove("nb-md-table-row-dragging");
+    indicator.hidden = true;
+    window.removeEventListener("mousemove", onMove, true);
+    window.removeEventListener("mouseup", onUp, true);
+
+    if (target) reorderTableRow(view, lineNumber, target);
+  };
+
+  window.addEventListener("mousemove", onMove, true);
+  window.addEventListener("mouseup", onUp, true);
+  onMove(event);
+}
+
+function tableRowDropTargetAtPoint(
+  view: EditorView,
+  tableStartLine: number,
+  sourceLine: number,
+  x: number,
+  y: number,
+): TableRowDropTarget | undefined {
+  const candidates = document.elementsFromPoint(x, y);
+
+  for (const candidate of candidates) {
+    const row = candidate instanceof Element
+      ? candidate.closest<HTMLElement>(".cm-nb-md-table-row")
+      : null;
+    if (!row || !view.dom.contains(row)) continue;
+    if (Number(row.dataset.tableStartLine) !== tableStartLine) continue;
+
+    const lineNumber = Number(row.dataset.tableLine);
+    if (!Number.isInteger(lineNumber) || lineNumber === sourceLine) continue;
+
+    const rect = row.getBoundingClientRect();
+    const placement = y < rect.top + rect.height / 2 ? "before" : "after";
+    return { lineNumber, placement, row };
+  }
+
+  return undefined;
+}
+
+function tableDropIndicator(): HTMLElement {
+  let indicator = document.querySelector<HTMLElement>(
+    ".cm-nb-md-table-drop-indicator",
+  );
+
+  if (!indicator) {
+    indicator = document.createElement("div");
+    indicator.className = "cm-nb-md-table-drop-indicator";
+    indicator.hidden = true;
+    document.body.append(indicator);
+  }
+
+  return indicator;
+}
+
+function positionTableDropIndicator(
+  indicator: HTMLElement,
+  target: TableRowDropTarget,
+): void {
+  const rect = target.row.getBoundingClientRect();
+  const y = target.placement === "before" ? rect.top : rect.bottom;
+
+  indicator.hidden = false;
+  indicator.style.left = `${rect.left}px`;
+  indicator.style.top = `${Math.round(y)}px`;
+  indicator.style.width = `${rect.width}px`;
+}
+
+function reorderTableRow(
+  view: EditorView,
+  sourceLineNumber: number,
+  target: TableRowDropTarget,
+): void {
+  const doc = view.state.doc;
+  if (
+    sourceLineNumber < 1 ||
+    sourceLineNumber > doc.lines ||
+    target.lineNumber < 1 ||
+    target.lineNumber > doc.lines
+  ) {
+    return;
+  }
+
+  const sourceLine = doc.line(sourceLineNumber);
+  const sourceText = sourceLine.text;
+  const removeFrom = sourceLine.from;
+  const removeTo = sourceLine.to + (sourceLineNumber < doc.lines ? 1 : 0);
+
+  let insertLineNumber =
+    target.placement === "before" ? target.lineNumber : target.lineNumber + 1;
+
+  if (insertLineNumber === sourceLineNumber || insertLineNumber === sourceLineNumber + 1) {
+    return;
+  }
+
+  if (insertLineNumber > sourceLineNumber) insertLineNumber -= 1;
+
+  const afterRemoval = doc.toString().slice(0, removeFrom) + doc.toString().slice(removeTo);
+  const lines = afterRemoval.split("\n");
+  const insertIndex = Math.max(0, Math.min(lines.length, insertLineNumber - 1));
+  lines.splice(insertIndex, 0, sourceText);
+
+  view.dispatch({
+    changes: { from: 0, to: doc.length, insert: lines.join("\n") },
+    scrollIntoView: true,
+  });
+}
+
 function commitTableCell(
   view: EditorView,
-  lineFrom: number,
+  lineNumber: number,
   cellIndex: number,
   value: string,
 ): void {
-  const line = view.state.doc.lineAt(Math.min(lineFrom, view.state.doc.length));
+  if (lineNumber < 1 || lineNumber > view.state.doc.lines) return;
+
+  const line = view.state.doc.line(lineNumber);
   const row = parseTableRow(line.text);
   if (!row || row.separator || row.cells[cellIndex] == null) return;
 
@@ -657,6 +1043,178 @@ function commitTableCell(
   });
 }
 
+function commitTableCellElement(view: EditorView, cell: HTMLElement): void {
+  const lineNumber = Number(cell.dataset.tableLine);
+  const cellIndex = Number(cell.dataset.tableCell);
+
+  if (!Number.isInteger(lineNumber) || !Number.isInteger(cellIndex)) return;
+
+  const value =
+    cell.dataset.editing === "true"
+      ? tableCellEditableText(cell)
+      : (cell.dataset.raw ?? "");
+
+  cell.dataset.raw = value;
+  cell.dataset.editing = "false";
+
+  commitTableCell(view, lineNumber, cellIndex, value);
+}
+
+function syncTableCellRaw(cell: HTMLElement): void {
+  if (cell.dataset.editing !== "true") return;
+  cell.dataset.raw = tableCellEditableText(cell);
+}
+
+function queueTableCellRawSync(cell: HTMLElement): void {
+  requestAnimationFrame(() => syncTableCellRaw(cell));
+}
+
+function tableCellEditableText(cell: HTMLElement): string {
+  const clone = cell.cloneNode(true) as HTMLElement;
+  for (const handle of clone.querySelectorAll(".cm-nb-md-table-resize")) {
+    handle.remove();
+  }
+
+  return clone.textContent ?? "";
+}
+
+function showRawTableCellSyntax(cell: HTMLElement): void {
+  if (cell.dataset.editing === "true") return;
+
+  const raw = cell.dataset.raw ?? "";
+  const handle = detachTableResizeHandle(cell);
+  cell.replaceChildren(document.createTextNode(raw));
+  if (handle) cell.append(handle);
+  cell.dataset.editing = "true";
+}
+
+function renderTableCellDisplay(cell: HTMLElement): void {
+  const raw = cell.dataset.raw ?? "";
+  const handle = detachTableResizeHandle(cell);
+  cell.replaceChildren();
+  appendRenderedInlineMarkdown(cell, raw);
+  if (handle) cell.append(handle);
+  cell.dataset.editing = "false";
+}
+
+function detachTableResizeHandle(cell: HTMLElement): HTMLElement | undefined {
+  const handle = cell.querySelector<HTMLElement>(":scope > .cm-nb-md-table-resize");
+  handle?.remove();
+  return handle ?? undefined;
+}
+
+function appendRenderedInlineMarkdown(parent: HTMLElement, text: string): void {
+  const token =
+    /(\*\*[^*\n]+?\*\*|`[^`\n]+?`|\[[^\]\n]+?\]\([^) \n]+?\)|(?<!\*)\*[^*\n]+?\*(?!\*))/g;
+  let index = 0;
+
+  for (const match of text.matchAll(token)) {
+    if (match.index == null) continue;
+
+    appendText(parent, text.slice(index, match.index));
+    appendMarkdownToken(parent, match[0]);
+    index = match.index + match[0].length;
+  }
+
+  appendText(parent, text.slice(index));
+}
+
+function appendMarkdownToken(parent: HTMLElement, token: string): void {
+  if (token.startsWith("**") && token.endsWith("**")) {
+    const strong = document.createElement("strong");
+    strong.className = "cm-nb-md-strong";
+    strong.textContent = token.slice(2, -2);
+    parent.append(strong);
+    return;
+  }
+
+  if (token.startsWith("`") && token.endsWith("`")) {
+    const code = document.createElement("code");
+    code.className = "cm-nb-md-inline-code";
+    code.textContent = token.slice(1, -1);
+    parent.append(code);
+    return;
+  }
+
+  const link = /^\[([^\]\n]+?)\]\(([^) \n]+?)\)$/.exec(token);
+  if (link) {
+    const anchor = document.createElement("span");
+    anchor.className = "cm-nb-md-link-text";
+    anchor.textContent = link[1];
+    anchor.title = link[2];
+    parent.append(anchor);
+    return;
+  }
+
+  if (token.startsWith("*") && token.endsWith("*")) {
+    const emphasis = document.createElement("em");
+    emphasis.className = "cm-nb-md-emphasis";
+    emphasis.textContent = token.slice(1, -1);
+    parent.append(emphasis);
+    return;
+  }
+
+  appendText(parent, token);
+}
+
+function appendText(parent: HTMLElement, text: string): void {
+  if (!text) return;
+  parent.append(document.createTextNode(text));
+}
+
+class FootnoteDefinitionWidget extends WidgetType {
+  constructor(private readonly footnote: FootnoteRenderModel) {
+    super();
+  }
+
+  eq(other: FootnoteDefinitionWidget): boolean {
+    return (
+      other.footnote.id === this.footnote.id &&
+      other.footnote.body === this.footnote.body
+    );
+  }
+
+  toDOM(): HTMLElement {
+    const row = document.createElement("span");
+    row.className = "cm-nb-md-footnote";
+
+    const id = document.createElement("sup");
+    id.className = "cm-nb-md-footnote-id";
+    id.textContent = this.footnote.id;
+
+    const body = document.createElement("span");
+    body.className = "cm-nb-md-footnote-body";
+    appendRenderedInlineMarkdown(body, this.footnote.body);
+
+    row.append(id, body);
+    return row;
+  }
+}
+
+function insertTextIntoEditableCell(text: string): void {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    document.execCommand("insertText", false, text);
+    return;
+  }
+
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  const node = document.createTextNode(text);
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function activeTableCell(): HTMLElement | undefined {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return undefined;
+  if (!active.classList.contains("cm-nb-md-table-cell")) return undefined;
+  return active;
+}
+
 function normalizeTableCellText(value: string): string {
   return value.replace(/\s+/g, " ").trim().replaceAll("|", "\\|");
 }
@@ -667,29 +1225,31 @@ function renderTableRow(cells: readonly string[]): string {
 
 function moveTableCellFocus(
   view: EditorView,
-  lineFrom: number,
+  lineNumber: number,
   cellIndex: number,
   backwards: boolean,
 ): void {
   const doc = view.state.doc;
-  const line = doc.lineAt(Math.min(lineFrom, doc.length));
+  if (lineNumber < 1 || lineNumber > doc.lines) return;
+
+  const line = doc.line(lineNumber);
   const row = parseTableRow(line.text);
   if (!row || row.separator) return;
 
   if (backwards) {
     const target = previousTableCell(view, line.number, cellIndex);
-    if (target) focusRenderedTableCell(target.lineNumber, target.cellIndex);
+    if (target) focusRenderedTableCell(view, target.lineNumber, target.cellIndex);
     return;
   }
 
   if (cellIndex + 1 < row.cells.length) {
-    focusRenderedTableCell(line.number, cellIndex + 1);
+    focusRenderedTableCell(view, line.number, cellIndex + 1);
     return;
   }
 
   const target = nextTableCell(view, line.number);
   if (target) {
-    focusRenderedTableCell(target.lineNumber, target.cellIndex);
+    focusRenderedTableCell(view, target.lineNumber, target.cellIndex);
     return;
   }
 
@@ -729,10 +1289,14 @@ function nextTableCell(
   return undefined;
 }
 
-function focusRenderedTableCell(lineNumber: number, cellIndex: number): void {
+function focusRenderedTableCell(
+  view: EditorView,
+  lineNumber: number,
+  cellIndex: number,
+): void {
   requestAnimationFrame(() => {
     const selector = `.cm-nb-md-table-cell[data-table-line="${lineNumber}"][data-table-cell="${cellIndex}"]`;
-    const cell = document.querySelector<HTMLElement>(selector);
+    const cell = view.dom.querySelector<HTMLElement>(selector);
     if (!cell) return;
 
     cell.focus();

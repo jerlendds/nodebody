@@ -205,65 +205,75 @@ function updateActivityButtons(
 
 function registerPaneContextMenus(root: ParentNode, scope: Scope) {
   const manager = getContextMenuManager();
-  for (const pane of root.querySelectorAll<HTMLElement>(".nb-pane")) {
+  for (const surface of root.querySelectorAll<HTMLElement>(".nb-pane__surface")) {
     scope.add(
-      manager.register(pane, {
+      manager.register(surface, {
         getActions() {
-          const hasSelection = selectedTextIn(pane).length > 0;
+          const modifier = navigator.platform.includes("Mac") ? "Cmd" : "Ctrl";
+
           return [
             {
-              id: "copy",
+              id: "pane.copy",
               label: "Copy",
-              accelerator: navigator.platform.includes("Mac")
-                ? "Cmd+C"
-                : "Ctrl+C",
-              enabled: hasSelection,
+              accelerator: `${modifier}+C`,
+              enabled: true,
+            },
+            {
+              id: "pane.cut",
+              label: "Cut",
+              accelerator: `${modifier}+X`,
+              enabled: true,
+            },
+            {
+              id: "pane.paste",
+              label: "Paste",
+              accelerator: `${modifier}+V`,
+              enabled: true,
             },
           ];
         },
 
         async runAction(actionId) {
-          if (actionId !== "copy") return;
-          const text = selectedTextIn(pane);
-          if (!text) return;
-          await copyText(text);
+          switch (actionId) {
+            case "pane.copy":
+              if (!document.execCommand("copy")) {
+                const text = selectedTextIn(surface);
+                if (text) await copyText(text);
+              }
+              return;
+            case "pane.cut":
+              document.execCommand("cut");
+              return;
+            case "pane.paste":
+              document.execCommand("paste");
+              return;
+          }
         },
       }),
     );
 
-    const show = (event: MouseEvent | PointerEvent) => {
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest(".nb-md-editor")) return;
-
+    const show = (event: MouseEvent) => {
       event.preventDefault();
       event.stopPropagation();
       void manager.showForElement(
-        pane,
+        surface,
         "mouse",
         { x: event.clientX, y: event.clientY },
         event,
       );
     };
-    const onContextMenu = (event: MouseEvent) => show(event);
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 2) return;
-      event.preventDefault();
-      event.stopPropagation();
-      window.setTimeout(() => show(event), 0);
+    const onContextMenu = (event: MouseEvent) => {
+      if (event.defaultPrevented) return;
+      show(event);
     };
 
-    pane.addEventListener("contextmenu", onContextMenu, {
-      capture: true,
-      passive: false,
-    });
-    pane.addEventListener("pointerdown", onPointerDown, {
+    surface.addEventListener("contextmenu", onContextMenu, {
       capture: true,
       passive: false,
     });
     scope.add(
       disposable(() => {
-        pane.removeEventListener("contextmenu", onContextMenu, true);
-        pane.removeEventListener("pointerdown", onPointerDown, true);
+        surface.removeEventListener("contextmenu", onContextMenu, true);
       }),
     );
   }

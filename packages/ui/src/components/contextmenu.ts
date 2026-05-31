@@ -331,12 +331,11 @@ export class ContextMenuController implements Disposable {
 
   private resolveScope(start: EventTarget | null): RegisteredScope | undefined {
     let node = elementFromEventTarget(start);
-    let resolved: RegisteredScope | undefined;
 
     while (node) {
       if (node instanceof HTMLElement) {
         const scope = this.scopes.get(node);
-        if (scope) resolved = { element: node, scope };
+        if (scope) return { element: node, scope };
       }
 
       if (node.parentElement) {
@@ -353,31 +352,25 @@ export class ContextMenuController implements Disposable {
       break;
     }
 
-    return resolved;
+    return undefined;
   }
 
   private resolveScopeForEvent(event: MouseEvent): RegisteredScope | undefined {
-    let resolved: RegisteredScope | undefined;
-
     for (const target of event.composedPath()) {
       const candidate = this.resolveScope(target);
-      if (candidate) resolved = candidate;
+      if (candidate) return candidate;
     }
-
-    if (resolved) return resolved;
 
     return this.resolveScopeForPoint(event.clientX, event.clientY);
   }
 
   private resolveScopeForPoint(x: number, y: number): RegisteredScope | undefined {
-    let resolved: RegisteredScope | undefined;
-
     for (const target of document.elementsFromPoint(x, y)) {
       const candidate = this.resolveScope(target);
-      if (candidate) resolved = candidate;
+      if (candidate) return candidate;
     }
 
-    return resolved;
+    return undefined;
   }
 
   private clearHoverTimer(): void {

@@ -13,8 +13,13 @@ export function createDesktopContextMenuBridge(): ContextMenuBridge {
         menu.setAttribute("role", "menu");
         menu.tabIndex = -1;
 
+        let armDismissTimer: number | undefined;
         let resolved = false;
         const cleanup = () => {
+          if (armDismissTimer !== undefined) {
+            window.clearTimeout(armDismissTimer);
+            armDismissTimer = undefined;
+          }
           if (activeDismiss === onDismiss) activeDismiss = undefined;
           document.removeEventListener("pointerdown", onPointerDown, true);
           document.removeEventListener("keydown", onKeyDown, true);
@@ -73,10 +78,14 @@ export function createDesktopContextMenuBridge(): ContextMenuBridge {
         menu.style.visibility = "";
         activeDismiss = onDismiss;
 
-        document.addEventListener("pointerdown", onPointerDown, true);
-        document.addEventListener("keydown", onKeyDown, true);
-        window.addEventListener("resize", onDismiss, true);
-        window.addEventListener("blur", onDismiss, true);
+        armDismissTimer = window.setTimeout(() => {
+          armDismissTimer = undefined;
+          if (resolved) return;
+          document.addEventListener("pointerdown", onPointerDown, true);
+          document.addEventListener("keydown", onKeyDown, true);
+          window.addEventListener("resize", onDismiss, true);
+          window.addEventListener("blur", onDismiss, true);
+        }, 0);
 
         requestAnimationFrame(() => {
           enabledItems(menu)[0]?.focus();
