@@ -4,6 +4,8 @@ import { disposable, type Scope } from "../base/disposable";
 import { mount } from "../base/component";
 import type { PaneModel } from "./types";
 import { plusIcon, xIcon } from "./icons";
+import { layoutFromLegacyPanes } from "../layout/legacy";
+import { createLayoutSurface } from "../layout/render";
 
 export interface PaneGroupActions {
   addTab?: (paneId: string) => void;
@@ -18,11 +20,26 @@ export function createPaneGroup(
   scope: Scope,
   actions: PaneGroupActions = {}
 ) {
-  const group = el("section", "nb-pane-group");
-  group.setAttribute("aria-label", "Editor panes");
-
-  for (const pane of panes) group.append(createPane(pane, scope, actions));
-  return group;
+  const doc = layoutFromLegacyPanes(panes);
+  const paneByStack = new Map<string, string>(
+    panes.map((pane) => [`stack:${pane.id}`, pane.id] as const),
+  );
+  const surface = createLayoutSurface(doc, scope, {
+    addTab(stackId) {
+      const paneId = paneByStack.get(stackId);
+      if (paneId) actions.addTab?.(paneId);
+    },
+    dispatch(tx) {
+      if (tx.type !== "activateTab" && tx.type !== "closeTab") return;
+      const paneId = paneByStack.get(tx.stackId);
+      if (!paneId) return;
+      if (tx.type === "activateTab") actions.activateTab?.(paneId, tx.tabId);
+      else actions.closeTab?.(paneId, tx.tabId);
+    },
+  });
+  surface.classList.add("nb-pane-group");
+  surface.setAttribute("aria-label", "Editor panes");
+  return surface;
 }
 
 /// Create one tabbed pane and mount its active view, if provided.

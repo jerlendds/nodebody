@@ -1,4 +1,5 @@
 .nb-welcome {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(240px, 360px) minmax(280px, 420px);
   gap: 32px;
@@ -7,6 +8,25 @@
   height: 100%;
   margin: 0 auto;
   color: var(--nb-foreground);
+}
+
+.nb-welcome-startup {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--nb-muted);
+  font-size: 12px;
+  transform: translateX(-50%);
+}
+
+.nb-welcome-startup input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--nb-accent);
 }
 
 .nb-welcome h1 {

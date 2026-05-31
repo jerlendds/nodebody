@@ -1,6 +1,11 @@
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import type { Component, Scope } from "@nodebody/ui";
+import type {
+  Component,
+  LayoutContributionSink,
+  LayoutPortSink,
+  Scope,
+} from "@nodebody/ui";
 import { disposable, el } from "@nodebody/ui";
 import { markdownEditorExtensions } from "./extensions";
 import {
@@ -18,6 +23,8 @@ export interface MarkdownEditorComponentOptions {
   markdown?: MarkdownOptions;
   plugins?: readonly MarkdownEditorPlugin[];
   allowPlugin?: (plugin: MarkdownEditorPlugin) => boolean;
+  layout?: LayoutContributionSink;
+  ports?: LayoutPortSink;
   onChange?: (event: MarkdownChangeEvent) => void;
   onSave?: (
     value: string,

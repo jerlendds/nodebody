@@ -9,6 +9,15 @@ export interface TabModel {
   resource: string;
   active?: boolean;
   view?: Component;
+  kind?: string;
+  layout?: {
+    minWidth?: number;
+    minHeight?: number;
+    preferredWidth?: number;
+    preferredHeight?: number;
+    morphology?: TabMorphology;
+    persistent?: boolean;
+  };
 }
 
 /// A leaf pane with a tab strip and optional mounted view.
@@ -16,3 +25,12 @@ export interface PaneModel {
   id: string;
   tabs: TabModel[];
 }
+
+export type TabMorphology =
+  | "full"
+  | "compact"
+  | "peek"
+  | "card"
+  | "margin"
+  | "inline-popover"
+  | "ghost";

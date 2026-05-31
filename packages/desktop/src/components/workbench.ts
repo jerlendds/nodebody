@@ -3,20 +3,24 @@ import type {
   Component,
   ComponentThemeInput,
   DropdownSelectEventDetail,
+  LayoutDocument,
+  LayoutTransaction,
 } from "@nodebody/ui";
 import {
   Scope,
   signal,
   mount,
   delegate,
-  createPaneGroup,
+  LayoutRenderer,
+  layoutFromLegacyPanes,
+  applyLayoutTransaction,
   disposable,
   getContextMenuManager,
   getHotkeyManager,
   graphFolderIcon,
   applyComponentTheme,
 } from "@nodebody/ui";
-import { welcomeView } from "../pages/welcome";
+import { shouldShowWelcomeOnStartup, welcomeView } from "../pages/welcome";
 import type { ActivityItem, SidebarSide } from "./sidebar";
 import { createSidebar } from "./sidebar";
 import { createToolbar } from "./toolbar";
@@ -29,6 +33,7 @@ export interface WorkbenchOptions {
   sidebarWidth?: number;
   xplorerWidth?: number;
   activities?: ActivityItem[];
+  layout?: LayoutDocument;
   panes?: PaneModel[];
   theme?: ComponentThemeInput;
 }
@@ -42,20 +47,29 @@ const defaultActivities = [
   },
 ];
 
-const defaultPanes = [
-  {
-    id: "main",
-    tabs: [
-      {
-        id: "welcome",
-        title: "Welcome",
-        resource: "nodebody://welcome",
-        active: true,
-        view: welcomeView,
-      },
-    ],
-  },
-];
+function defaultPanes(): PaneModel[] {
+  return [
+    {
+      id: "main",
+      tabs: [
+        shouldShowWelcomeOnStartup()
+          ? {
+              id: "welcome",
+              title: "Welcome",
+              resource: "nodebody://welcome",
+              active: true,
+              view: welcomeView,
+            }
+          : {
+              id: "empty-start",
+              title: "New empty tab",
+              resource: "nodebody://empty/start",
+              active: true,
+            },
+      ],
+    },
+  ];
+}
 
 /// Create the root Nodebody workbench shell from declarative sidebar
 /// and pane options.
@@ -65,8 +79,9 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       const side = options.sidebarSide ?? "left";
       const activeActivity = signal("home");
       const isXplorerOpen = signal(false);
-      const panes = signal<PaneModel[]>(
-        clonePanes(options.panes ?? defaultPanes),
+      const layout = signal<LayoutDocument>(
+        options.layout ??
+          layoutFromLegacyPanes(clonePanes(options.panes ?? defaultPanes())),
       );
       root.className = `nb-workbench nb-workbench--sidebar-${side}`;
       applyComponentTheme(root as HTMLElement, {
@@ -93,21 +108,22 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       paneMount.className = "nb-pane-mount";
       root.replaceChildren(toolbar, sidebar, xplorer, paneMount);
       scope.add(mount(statusBar, root));
-      let paneScope = scope.add(new Scope());
+      const layoutRenderer = scope.add(
+        new LayoutRenderer({
+          addTab: (stackId) => layout.set(addEmptyTab(layout.get(), stackId)),
+          dispatch: (tx) =>
+            layout.set(applyLayoutTransaction(layout.get(), tx)),
+          resolveContent: (content) => content.view,
+        }),
+      );
+      paneMount.replaceChildren(layoutRenderer.element);
+      registerLayoutContextMenus(layoutRenderer.element, scope, (tx) => {
+        layout.set(applyLayoutTransaction(layout.get(), tx));
+      });
 
       scope.add(
-        panes.subscribe(() => {
-          paneScope.dispose();
-          paneScope = scope.add(new Scope());
-          const paneGroup = createPaneGroup(panes.get(), paneScope, {
-            addTab: (paneId) => panes.set(addEmptyTab(panes.get(), paneId)),
-            activateTab: (paneId, tabId) =>
-              panes.set(activateTab(panes.get(), paneId, tabId)),
-            closeTab: (paneId, tabId) =>
-              panes.set(closeTab(panes.get(), paneId, tabId)),
-          });
-          paneMount.replaceChildren(paneGroup);
-          registerPaneContextMenus(paneGroup, paneScope);
+        layout.subscribe(() => {
+          layoutRenderer.update(layout.get());
         }),
       );
 
@@ -203,80 +219,127 @@ function updateActivityButtons(
   }
 }
 
-function registerPaneContextMenus(root: ParentNode, scope: Scope) {
+function registerLayoutContextMenus(
+  root: HTMLElement,
+  scope: Scope,
+  dispatchLayout: (tx: LayoutTransaction) => void,
+) {
   const manager = getContextMenuManager();
-  for (const surface of root.querySelectorAll<HTMLElement>(".nb-pane__surface")) {
-    scope.add(
-      manager.register(surface, {
-        getActions() {
-          const modifier = navigator.platform.includes("Mac") ? "Cmd" : "Ctrl";
+  scope.add(
+    manager.register(root, {
+      shouldShow(event) {
+        return Boolean(event.target.closest("[data-content]"));
+      },
 
-          return [
-            {
-              id: "pane.copy",
-              label: "Copy",
-              accelerator: `${modifier}+C`,
-              enabled: true,
-            },
-            {
-              id: "pane.cut",
-              label: "Cut",
-              accelerator: `${modifier}+X`,
-              enabled: true,
-            },
-            {
-              id: "pane.paste",
-              label: "Paste",
-              accelerator: `${modifier}+V`,
-              enabled: true,
-            },
-          ];
-        },
+      getActions() {
+        const modifier = navigator.platform.includes("Mac") ? "Cmd" : "Ctrl";
 
-        async runAction(actionId) {
-          switch (actionId) {
-            case "pane.copy":
-              if (!document.execCommand("copy")) {
-                const text = selectedTextIn(surface);
-                if (text) await copyText(text);
-              }
-              return;
-            case "pane.cut":
-              document.execCommand("cut");
-              return;
-            case "pane.paste":
-              document.execCommand("paste");
-              return;
-          }
-        },
-      }),
-    );
+        return [
+          {
+            id: "layout.splitRight",
+            label: "Split Right",
+            enabled: true,
+          },
+          {
+            id: "layout.splitDown",
+            label: "Split Down",
+            enabled: true,
+          },
+          { type: "separator", id: "layout.separator.edit" },
+          {
+            id: "pane.copy",
+            label: "Copy",
+            accelerator: `${modifier}+C`,
+            enabled: true,
+          },
+          {
+            id: "pane.cut",
+            label: "Cut",
+            accelerator: `${modifier}+X`,
+            enabled: true,
+          },
+          {
+            id: "pane.paste",
+            label: "Paste",
+            accelerator: `${modifier}+V`,
+            enabled: true,
+          },
+        ];
+      },
 
-    const show = (event: MouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void manager.showForElement(
-        surface,
-        "mouse",
-        { x: event.clientX, y: event.clientY },
-        event,
-      );
-    };
-    const onContextMenu = (event: MouseEvent) => {
-      if (event.defaultPrevented) return;
-      show(event);
-    };
+      async runAction(actionId, event) {
+        const surface = event.target.closest<HTMLElement>("[data-content]");
+        if (!surface) return;
+        const nodeId =
+          surface.dataset.splitTarget ??
+          surface.closest<HTMLElement>("[data-stack]")?.dataset.stack ??
+          surface.dataset.layoutNode;
 
-    surface.addEventListener("contextmenu", onContextMenu, {
-      capture: true,
-      passive: false,
-    });
-    scope.add(
-      disposable(() => {
-        surface.removeEventListener("contextmenu", onContextMenu, true);
-      }),
-    );
-  }
+        switch (actionId) {
+          case "layout.splitRight":
+            if (nodeId) dispatchLayout(createEmptySplit(nodeId, "horizontal"));
+            return;
+          case "layout.splitDown":
+            if (nodeId) dispatchLayout(createEmptySplit(nodeId, "vertical"));
+            return;
+          case "pane.copy":
+            if (!document.execCommand("copy")) {
+              const text = selectedTextIn(surface);
+              if (text) await copyText(text);
+            }
+            return;
+          case "pane.cut":
+            document.execCommand("cut");
+            return;
+          case "pane.paste":
+            document.execCommand("paste");
+            return;
+        }
+      },
+    }),
+  );
+}
+
+function createEmptySplit(
+  targetNodeId: string,
+  axis: "horizontal" | "vertical",
+): LayoutTransaction {
+  const id = `empty-${Date.now().toString(36)}`;
+  return {
+    type: "splitNode",
+    targetNodeId,
+    axis,
+    position: "after",
+    newNode: {
+      kind: "stack",
+      id: `stack:${id}`,
+      tabIds: [id],
+      activeTabId: id,
+    },
+    nodes: [
+      {
+        kind: "content",
+        id: `page:${id}`,
+        contentId: `content:${id}`,
+      },
+    ],
+    tabs: [
+      {
+        id,
+        title: "New empty tab",
+        resource: `nodebody://empty/${id}`,
+        page: `page:${id}`,
+        closable: true,
+      },
+    ],
+    contents: [
+      {
+        id: `content:${id}`,
+        kind: "empty",
+        resource: `nodebody://empty/${id}`,
+      },
+    ],
+  };
 }
 
 function selectedTextIn(element: HTMLElement) {
@@ -313,56 +376,31 @@ function clonePanes(panes: PaneModel[]) {
   }));
 }
 
-function addEmptyTab(panes: PaneModel[], paneId: string) {
-  return panes.map((pane) => {
-    if (pane.id !== paneId) return pane;
-    const id = `empty-${Date.now().toString(36)}`;
-    return {
-      ...pane,
-      tabs: pane.tabs
-        .map((tab) => ({ ...tab, active: false }))
-        .concat({
-          id,
-          title: "New empty tab",
-          resource: `nodebody://empty/${id}`,
-          active: true,
-        }),
-    };
-  });
-}
+function addEmptyTab(doc: LayoutDocument, stackId: string) {
+  const stack = doc.nodes[stackId];
+  if (stack?.kind !== "stack") return doc;
 
-function activateTab(panes: PaneModel[], paneId: string, tabId: string) {
-  return panes.map((pane) =>
-    pane.id === paneId
-      ? {
-          ...pane,
-          tabs: pane.tabs.map((tab) => ({ ...tab, active: tab.id === tabId })),
-        }
-      : pane,
-  );
-}
-
-function closeTab(panes: PaneModel[], paneId: string, tabId: string) {
-  return panes.map((pane) => {
-    if (pane.id !== paneId) return pane;
-    const closingIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
-    if (closingIndex < 0) return pane;
-    const closingActive = pane.tabs[closingIndex].active;
-    const tabs = pane.tabs
-      .filter((tab) => tab.id !== tabId)
-      .map((tab) => ({ ...tab }));
-    if (!tabs.length) {
-      const id = `empty-${Date.now().toString(36)}`;
-      tabs.push({
-        id,
-        title: "New empty tab",
-        resource: `nodebody://empty/${id}`,
-        active: true,
-      });
-    } else if (closingActive || !tabs.some((tab) => tab.active)) {
-      const nextIndex = Math.min(closingIndex, tabs.length - 1);
-      tabs[nextIndex] = { ...tabs[nextIndex], active: true };
-    }
-    return { ...pane, tabs };
+  const id = `empty-${Date.now().toString(36)}`;
+  return applyLayoutTransaction(doc, {
+    type: "openTab",
+    stackId,
+    tab: {
+      id,
+      title: "New empty tab",
+      resource: `nodebody://empty/${id}`,
+      page: `page:${id}`,
+      closable: true,
+    },
+    page: {
+      kind: "content",
+      id: `page:${id}`,
+      contentId: `content:${id}`,
+    },
+    content: {
+      id: `content:${id}`,
+      kind: "empty",
+      resource: `nodebody://empty/${id}`,
+    },
+    activate: true,
   });
 }

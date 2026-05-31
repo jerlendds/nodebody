@@ -35,6 +35,36 @@
   --modal-overlay: rgba(1, 6, 19, 0.58);
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nb-subtle) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--nb-subtle);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--nb-muted);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .nb-workbench {
   display: grid;
   grid-template:

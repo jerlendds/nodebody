@@ -1,0 +1,125 @@
+.nb-layout-surface,
+.nb-stack,
+.nb-tab-page,
+.nb-split,
+.nb-split__child,
+.nb-content-surface {
+  min-width: 0;
+  min-height: 0;
+}
+
+.nb-layout-surface {
+  width: 100%;
+  height: 100%;
+  background: var(--nb-surface);
+  overflow: hidden;
+}
+
+.nb-stack {
+  display: grid;
+  grid-template-rows: var(--nb-tab-height) minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+}
+
+.nb-stack[data-tabbar="hidden"] {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.nb-tab-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.nb-split {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 1px;
+  background: var(--nb-border);
+}
+
+.nb-split--horizontal {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.nb-split--vertical {
+  grid-auto-flow: row;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.nb-split__child {
+  position: relative;
+  overflow: hidden;
+  background: var(--nb-surface);
+}
+
+.nb-split__gutter {
+  position: relative;
+  z-index: 2;
+  background: var(--nb-border);
+}
+
+.nb-split__gutter::before {
+  position: absolute;
+  content: "";
+}
+
+.nb-split--horizontal > .nb-split__gutter::before {
+  inset: 0 -4px;
+}
+
+.nb-split--vertical > .nb-split__gutter::before {
+  inset: -4px 0;
+}
+
+.nb-split__gutter:hover,
+.nb-split.is-resizing .nb-split__gutter {
+  background: color-mix(in srgb, var(--nb-border) 70%, #8fb7ff);
+}
+
+.nb-split--horizontal > .nb-split__gutter {
+  cursor: col-resize;
+}
+
+.nb-split--vertical > .nb-split__gutter {
+  cursor: row-resize;
+}
+
+.nb-content-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--nb-surface);
+}
+
+.nb-tab.is-dragging {
+  opacity: 0.62;
+}
+
+.nb-stack-close {
+  flex: 0 0 auto;
+  color: var(--nb-muted);
+}
+
+.nb-content-surface[data-drop-side]::after {
+  position: absolute;
+  inset: 8px;
+  z-index: 30;
+  pointer-events: none;
+  border: 1px solid var(--nb-accent);
+  background: color-mix(in srgb, var(--nb-accent) 18%, transparent);
+  content: "";
+}
+
+.nb-content-surface[data-drop-side="left"]::after {
+  right: 50%;
+}
+
+.nb-content-surface[data-drop-side="right"]::after {
+  left: 50%;
+}

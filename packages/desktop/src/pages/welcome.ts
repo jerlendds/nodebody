@@ -17,6 +17,8 @@ import type { TrustedHtml } from "@nodebody/ui";
 
 type StartAction = "create-space" | "open-space" | "open-settings";
 
+export const welcomeStartupPreferenceKey = "nodebody.showWelcomeOnStartup";
+
 const starts: [StartAction, string, TrustedHtml][] = [
   ["create-space", "Create new space...", spaceshipLaunchDocumentationIcon],
   ["open-space", "Open a space...", signingADocumentIcon],
@@ -27,10 +29,14 @@ const starts: [StartAction, string, TrustedHtml][] = [
 export const welcomeView: Component = {
   mount(root) {
     const page = el("section", "nb-welcome");
-    page.append(createIntro(), createWalkthroughs());
+    page.append(createIntro(), createWalkthroughs(), createStartupPreference());
     root.replaceChildren(page);
   },
 };
+
+export function shouldShowWelcomeOnStartup() {
+  return localStorage.getItem(welcomeStartupPreferenceKey) !== "false";
+}
 
 function createIntro() {
   const section = el("section", "nb-welcome__intro");
@@ -233,4 +239,22 @@ function createWalkthroughs() {
   );
   section.append(announcements);
   return section;
+}
+
+function createStartupPreference() {
+  const label = el("label", "nb-welcome-startup");
+  const checkbox = el("input") as HTMLInputElement;
+  checkbox.type = "checkbox";
+  checkbox.checked = shouldShowWelcomeOnStartup();
+  const text = el("span", "", "Show welcome page on startup");
+
+  checkbox.addEventListener("change", () => {
+    localStorage.setItem(
+      welcomeStartupPreferenceKey,
+      checkbox.checked ? "true" : "false",
+    );
+  });
+
+  label.append(checkbox, text);
+  return label;
 }

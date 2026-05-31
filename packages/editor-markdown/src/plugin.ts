@@ -15,7 +15,9 @@ export type MarkdownPluginCapability =
   | "contextMenu"
   | "commands"
   | "network"
-  | "filesystem";
+  | "filesystem"
+  | "layout.ports"
+  | "layout.intents";
 
 export interface MarkdownPluginContext {
   readonly document: MarkdownDocumentModel;

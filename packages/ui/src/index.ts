@@ -8,6 +8,7 @@ export * from "./components/tooltip";
 export * from "./components/contextmenu";
 export * from "./components/dropdown";
 export * from "./components/modal";
+export * from "./layout";
 export * from "./base/animation";
 export * from "./base/component";
 export * from "./base/disposable";
