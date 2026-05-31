@@ -392,12 +392,10 @@ function withStartupWelcome(panes: PaneModel[]) {
   if (!panes.length) return [{ id: "main", tabs: [welcomeTab] }];
 
   const [first, ...rest] = panes;
-  const tabs = first.tabs;
-
   return [
     {
       ...first,
-      tabs: [welcomeTab, ...tabs],
+      tabs: [welcomeTab, ...first.tabs],
     },
     ...rest,
   ];
