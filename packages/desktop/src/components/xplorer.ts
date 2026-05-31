@@ -10,7 +10,10 @@ export interface XplorerNode {
 
 export interface XplorerOptions {
   width?: number;
+  minWidth?: number;
+  side?: "left" | "right";
   nodes?: XplorerNode[];
+  onResize?: (width: number) => void;
 }
 
 const defaultNodes: XplorerNode[] = [
@@ -44,8 +47,12 @@ const defaultNodes: XplorerNode[] = [
 ];
 
 export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
+  const minWidth = options.minWidth ?? 136;
   const root = el("aside", "nb-xplorer");
-  root.style.setProperty("--nb-xplorer-width", `${options.width ?? 244}px`);
+  root.style.setProperty(
+    "--nb-xplorer-width",
+    `${Math.max(minWidth, options.width ?? 244)}px`,
+  );
   root.setAttribute("aria-label", "File explorer");
   root.setAttribute("aria-hidden", "true");
 
@@ -181,7 +188,13 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     },
   });
 
-  root.append(header, tree);
+  const resizeHandle = el("div", "nb-xplorer__resize");
+  resizeHandle.setAttribute("role", "separator");
+  resizeHandle.setAttribute("aria-orientation", "vertical");
+  resizeHandle.title = "Resize File Xplorer";
+  bindResizeHandle(resizeHandle);
+
+  root.append(header, tree, resizeHandle);
   renderTree();
   return root;
 
@@ -224,6 +237,46 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     }
 
     return item;
+  }
+
+  function bindResizeHandle(handle: HTMLElement) {
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+
+      event.preventDefault();
+      handle.setPointerCapture(event.pointerId);
+      root.classList.add("is-resizing");
+
+      const startX = event.clientX;
+      const startWidth = root.getBoundingClientRect().width;
+      const direction = options.side === "right" ? -1 : 1;
+
+      const onPointerMove = (moveEvent: PointerEvent) => {
+        const width = Math.max(
+          minWidth,
+          Math.round(startWidth + (moveEvent.clientX - startX) * direction),
+        );
+        root.style.setProperty("--nb-xplorer-width", `${width}px`);
+        options.onResize?.(width);
+      };
+
+      const onPointerUp = (upEvent: PointerEvent) => {
+        handle.releasePointerCapture(upEvent.pointerId);
+        root.classList.remove("is-resizing");
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+      };
+
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+    };
+
+    handle.addEventListener("pointerdown", onPointerDown);
+    scope.add({
+      dispose() {
+        handle.removeEventListener("pointerdown", onPointerDown);
+      },
+    });
   }
 }
 

@@ -47,6 +47,8 @@ const defaultActivities = [
   },
 ];
 
+const minXplorerWidth = 136;
+
 function defaultPanes(): PaneModel[] {
   return [
     {
@@ -79,6 +81,9 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       const side = options.sidebarSide ?? "left";
       const activeActivity = signal("home");
       const isXplorerOpen = signal(false);
+      const xplorerWidth = signal(
+        Math.max(minXplorerWidth, options.xplorerWidth ?? 244),
+      );
       const layout = signal<LayoutDocument>(
         options.layout ??
           layoutFromLegacyPanes(
@@ -94,10 +99,20 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       });
       (root as HTMLElement).style.setProperty(
         "--nb-xplorer-width",
-        `${options.xplorerWidth ?? 244}px`,
+        `${xplorerWidth.get()}px`,
       );
       const toolbar = createToolbar(scope);
-      const xplorer = createXplorer({ width: options.xplorerWidth }, scope);
+      const xplorer = createXplorer(
+        {
+          width: xplorerWidth.get(),
+          minWidth: minXplorerWidth,
+          side,
+          onResize(width) {
+            xplorerWidth.set(width);
+          },
+        },
+        scope,
+      );
       const sidebar = createSidebar(
         {
           side,
@@ -197,6 +212,15 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           xplorer.classList.toggle("is-open", open);
           xplorer.setAttribute("aria-hidden", String(!open));
           updateActivityButtons(root, activeActivity.get(), open);
+        }),
+      );
+
+      scope.add(
+        xplorerWidth.subscribe(() => {
+          (root as HTMLElement).style.setProperty(
+            "--nb-xplorer-width",
+            `${xplorerWidth.get()}px`,
+          );
         }),
       );
     },
