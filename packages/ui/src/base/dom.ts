@@ -1,13 +1,13 @@
 /// Find the first element matching `selector` below `root`.
 export const $ = <T extends Element = Element>(
   selector: string,
-  root: ParentNode = document
+  root: ParentNode = document,
 ) => root.querySelector<T>(selector);
 
 /// Find all elements matching `selector` below `root`.
 export const $$ = <T extends Element = Element>(
   selector: string,
-  root: ParentNode = document
+  root: ParentNode = document,
 ) => [...root.querySelectorAll<T>(selector)];
 
 /// Get, set, or remove an attribute. Passing `null` removes the
@@ -21,7 +21,7 @@ export function attr(el: Element, name: string, value?: unknown) {
 /// Apply a shallow set of inline style properties.
 export function css(
   el: HTMLElement | SVGElement,
-  styles: Partial<CSSStyleDeclaration>
+  styles: Partial<CSSStyleDeclaration>,
 ) {
   Object.assign(el.style, styles);
 }
@@ -30,7 +30,7 @@ export function css(
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
-  text?: string
+  text?: string,
 ) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -45,7 +45,7 @@ export function reconcile<T>(
   cache: Map<string, Element>,
   items: readonly T[],
   key: (item: T) => string,
-  render: (item: T, existing?: Element) => Element
+  render: (item: T, existing?: Element) => Element,
 ) {
   const used = new Set<string>();
   let anchor: ChildNode | null = null;

@@ -72,7 +72,13 @@
 .nb-dropdown__accelerator,
 .nb-dropdown__submenu-arrow {
   color: currentColor;
-  opacity: 0.72;
+  opacity: 0.36;
+}
+.nb-dropdown__submenu-arrow svg {
+  height: 18px;
+  width: 18px;
+  right: -5px;
+  position: relative;
 }
 
 .nb-dropdown__separator {

@@ -1,5 +1,6 @@
-import { el } from "../base/dom";
 import type { Disposable, Scope } from "../base/disposable";
+import { appendHtml, el } from "../base";
+import { chevronRightIcon } from "./icons";
 
 export type DropdownItem =
   | DropdownActionItem
@@ -49,9 +50,7 @@ export interface DropdownController extends Disposable {
 }
 
 /// Attach a lightweight menu-style dropdown to an existing trigger.
-export function attachDropdown(
-  options: DropdownOptions,
-): DropdownController {
+export function attachDropdown(options: DropdownOptions): DropdownController {
   const controller = new DropdownControllerImpl(options);
   options.scope.add(controller);
   return controller;
@@ -91,7 +90,10 @@ class DropdownControllerImpl implements DropdownController {
     this.trigger.setAttribute("aria-haspopup", "menu");
     this.trigger.setAttribute("aria-expanded", "false");
 
-    this.trigger.addEventListener("pointerdown", this.onTriggerPointerDownBound);
+    this.trigger.addEventListener(
+      "pointerdown",
+      this.onTriggerPointerDownBound,
+    );
     this.trigger.addEventListener("keydown", this.onTriggerKeyDownBound);
     this.element.addEventListener("click", this.onMenuClickBound);
     document.addEventListener("pointerdown", this.onDocumentPointerDownBound, {
@@ -283,9 +285,7 @@ function renderAction(item: DropdownActionItem) {
   button.append(label);
 
   if (item.accelerator) {
-    button.append(
-      el("span", "nb-dropdown__accelerator", item.accelerator),
-    );
+    button.append(el("span", "nb-dropdown__accelerator", item.accelerator));
   }
 
   return button;
@@ -293,19 +293,17 @@ function renderAction(item: DropdownActionItem) {
 
 function renderSubmenu(item: DropdownSubmenuItem) {
   const wrapper = el("div", "nb-dropdown__submenu-host");
-  const button = el(
-    "button",
-    "nb-dropdown__item nb-dropdown__item--submenu",
-  );
+  const button = el("button", "nb-dropdown__item nb-dropdown__item--submenu");
   button.type = "button";
   button.disabled = item.enabled === false;
   button.setAttribute("role", "menuitem");
   button.setAttribute("aria-haspopup", "menu");
 
   button.append(el("span", "nb-dropdown__label", item.label));
-  button.append(
-    el("span", "nb-dropdown__submenu-arrow", ">"),
-  );
+
+  const subMenuIcon = el("span", "nb-dropdown__submenu-arrow");
+  appendHtml(subMenuIcon, chevronRightIcon);
+  button.append(subMenuIcon);
   wrapper.append(button);
 
   const submenu = el("div", "nb-dropdown nb-dropdown__submenu");
@@ -333,7 +331,8 @@ function moveFocus(menu: HTMLElement, delta: number) {
   const active = document.activeElement;
   const current =
     active instanceof HTMLButtonElement ? items.indexOf(active) : -1;
-  const next = current < 0 ? 0 : (current + delta + items.length) % items.length;
+  const next =
+    current < 0 ? 0 : (current + delta + items.length) % items.length;
   items[next]?.focus();
 }
 
