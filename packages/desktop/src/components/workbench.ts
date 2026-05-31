@@ -81,7 +81,9 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       const isXplorerOpen = signal(false);
       const layout = signal<LayoutDocument>(
         options.layout ??
-          layoutFromLegacyPanes(clonePanes(options.panes ?? defaultPanes())),
+          layoutFromLegacyPanes(
+            withStartupWelcome(clonePanes(options.panes ?? defaultPanes())),
+          ),
       );
       root.className = `nb-workbench nb-workbench--sidebar-${side}`;
       applyComponentTheme(root as HTMLElement, {
@@ -374,6 +376,33 @@ function clonePanes(panes: PaneModel[]) {
     ...pane,
     tabs: pane.tabs.map((tab) => ({ ...tab })),
   }));
+}
+
+function withStartupWelcome(panes: PaneModel[]) {
+  if (!shouldShowWelcomeOnStartup()) return panes;
+
+  const welcomeTab = {
+    id: "welcome",
+    title: "Welcome",
+    resource: "nodebody://welcome",
+    active: true,
+    view: welcomeView,
+  };
+
+  if (!panes.length) return [{ id: "main", tabs: [welcomeTab] }];
+
+  const [first, ...rest] = panes;
+  const tabs = first.tabs
+    .filter((tab) => tab.id !== welcomeTab.id)
+    .map((tab) => ({ ...tab, active: false }));
+
+  return [
+    {
+      ...first,
+      tabs: [welcomeTab, ...tabs],
+    },
+    ...rest,
+  ];
 }
 
 function addEmptyTab(doc: LayoutDocument, stackId: string) {

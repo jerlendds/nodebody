@@ -123,3 +123,11 @@
 .nb-content-surface[data-drop-side="right"]::after {
   left: 50%;
 }
+
+.nb-content-surface[data-drop-side="top"]::after {
+  bottom: 50%;
+}
+
+.nb-content-surface[data-drop-side="bottom"]::after {
+  top: 50%;
+}

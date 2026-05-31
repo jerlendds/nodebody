@@ -21,6 +21,8 @@ interface DraggedTabPayload {
   tabId: LayoutTabId;
 }
 
+type DropSide = "left" | "right" | "top" | "bottom";
+
 export interface LayoutSurfaceActions {
   dispatch(tx: LayoutTransaction): void;
   addTab?: (stackId: LayoutNodeId) => void;
@@ -343,8 +345,8 @@ function bindContentDropTarget(
       fromStackId: payload.stackId,
       tabId: payload.tabId,
       targetNodeId,
-      axis: "horizontal",
-      position: side === "left" ? "before" : "after",
+      axis: side === "top" || side === "bottom" ? "vertical" : "horizontal",
+      position: side === "left" || side === "top" ? "before" : "after",
     });
   };
 
@@ -377,10 +379,20 @@ function draggedTabPayload(event: DragEvent): DraggedTabPayload | undefined {
   }
 }
 
-function dropSide(surface: HTMLElement, event: DragEvent): "left" | "right" {
+function dropSide(surface: HTMLElement, event: DragEvent): DropSide {
   const rect = surface.getBoundingClientRect();
   const x = event.clientX - rect.left;
-  return x < rect.width / 2 ? "left" : "right";
+  const y = event.clientY - rect.top;
+  const distances = [
+    ["left", x],
+    ["right", rect.width - x],
+    ["top", y],
+    ["bottom", rect.height - y],
+  ] as const;
+
+  return distances.reduce((nearest, candidate) => {
+    return candidate[1] < nearest[1] ? candidate : nearest;
+  })[0];
 }
 
 function clearDropIndicators(root: ParentNode) {
