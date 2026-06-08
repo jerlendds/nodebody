@@ -6,6 +6,7 @@ import { app } from "electron";
 export interface Space {
   name: string;
   path: string;
+  xplorerExpandedIds?: string[];
 }
 
 export interface SpacesStore {
@@ -65,11 +66,7 @@ export async function createSpace(directoryPath: string): Promise<Space> {
 
 export async function selectSpace(directoryPath: string): Promise<Space> {
   const spacePath = await normalizeDirectoryPath(directoryPath);
-  const metadata = path.join(spacePath, ".nb");
-  const stat = await fs.stat(metadata);
-  if (!stat.isDirectory()) {
-    throw new Error(`Space metadata path is not a directory: ${metadata}`);
-  }
+  await fs.mkdir(path.join(spacePath, ".nb"), { recursive: true });
 
   const space: Space = {
     name: path.basename(spacePath),
@@ -94,13 +91,33 @@ export function formatHomePathForDisplay(filePath: string) {
 
 async function saveSpace(space: Space) {
   const store = await readSpacesStore();
+  const existing = store.spaces.find((item) => item.path === space.path);
+  const savedSpace = {
+    ...existing,
+    ...space,
+  };
   const spaces = [
-    space,
+    savedSpace,
     ...store.spaces.filter((item) => item.path !== space.path),
   ];
   await writeSpacesStore({
     spaces,
     selectedSpacePath: space.path,
+  });
+}
+
+export async function updateSpaceXplorerExpandedIds(
+  spacePath: string,
+  xplorerExpandedIds: string[],
+) {
+  const store = await readSpacesStore();
+  await writeSpacesStore({
+    ...store,
+    spaces: store.spaces.map((space) =>
+      space.path === spacePath
+        ? { ...space, xplorerExpandedIds }
+        : space,
+    ),
   });
 }
 
@@ -144,9 +161,18 @@ function normalizeSpaces(value: unknown) {
     }
     if (seen.has(space.path)) continue;
     seen.add(space.path);
-    spaces.push({ name: space.name, path: space.path });
+    spaces.push({
+      name: space.name,
+      path: space.path,
+      xplorerExpandedIds: normalizeStringArray(space.xplorerExpandedIds),
+    });
   }
   return spaces;
+}
+
+function normalizeStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
 }
 
 function isErrorWithCode(error: unknown, code: string) {

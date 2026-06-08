@@ -76,6 +76,7 @@
 }
 
 .nb-tab__close {
+  position: relative;
   justify-self: center;
   display: grid;
   place-items: center;
@@ -94,6 +95,41 @@
 .nb-tab__close svg {
   width: 12px;
   height: 12px;
+}
+
+.nb-tab[data-saving="true"] .nb-tab__close {
+  opacity: 1;
+  pointer-events: none;
+}
+
+.nb-tab[data-saving="true"] .nb-tab__close svg {
+  opacity: 0;
+}
+
+.nb-tab[data-saving="true"] .nb-tab__close::before {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow:
+    -5px 0 0 currentColor,
+    5px 0 0 currentColor;
+  content: "";
+  animation: nb-tab-saving-dots 900ms ease-in-out infinite;
+}
+
+@keyframes nb-tab-saving-dots {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }
 
 .nb-tab:hover .nb-tab__close,

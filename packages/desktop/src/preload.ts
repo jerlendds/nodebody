@@ -20,10 +20,22 @@ contextBridge.exposeInMainWorld("os", {
 contextBridge.exposeInMainWorld("spaces", {
   list: () => ipcRenderer.invoke("spaces:list"),
   selected: () => ipcRenderer.invoke("spaces:selected"),
+  items: () => ipcRenderer.invoke("spaces:items"),
+  setXplorerExpandedIds: (ids: string[]) =>
+    ipcRenderer.invoke("spaces:setXplorerExpandedIds", ids),
+  readItem: (itemPath: string) => ipcRenderer.invoke("spaces:readItem", itemPath),
+  writeItem: (itemPath: string, value: string) =>
+    ipcRenderer.invoke("spaces:writeItem", itemPath, value),
   create: (directoryPath: string) =>
-    ipcRenderer.invoke("spaces:create", directoryPath),
+    ipcRenderer.invoke("spaces:create", directoryPath).then((space) => {
+      window.dispatchEvent(new CustomEvent("spaces:changed"));
+      return space;
+    }),
   select: (directoryPath: string) =>
-    ipcRenderer.invoke("spaces:select", directoryPath),
+    ipcRenderer.invoke("spaces:select", directoryPath).then((space) => {
+      window.dispatchEvent(new CustomEvent("spaces:changed"));
+      return space;
+    }),
 });
 
 contextBridge.exposeInMainWorld("contextMenu", {

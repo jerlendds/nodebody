@@ -14,37 +14,8 @@ export interface XplorerOptions {
   side?: "left" | "right";
   nodes?: XplorerNode[];
   onResize?: (width: number) => void;
+  onOpenFile?: (node: XplorerNode) => void;
 }
-
-const defaultNodes: XplorerNode[] = [
-  {
-    id: "graph",
-    name: "graph",
-    kind: "folder",
-    children: [
-      {
-        id: "graph/nodes",
-        name: "nodes",
-        kind: "folder",
-        children: [
-          { id: "graph/nodes/source.nb", name: "source.nb", kind: "file" },
-          { id: "graph/nodes/sink.nb", name: "sink.nb", kind: "file" },
-        ],
-      },
-      { id: "graph/edges.nb", name: "edges.nb", kind: "file" },
-    ],
-  },
-  {
-    id: "spaces",
-    name: "spaces",
-    kind: "folder",
-    children: [
-      { id: "spaces/default.nb", name: "default.nb", kind: "file" },
-      { id: "spaces/scratch.nb", name: "scratch.nb", kind: "file" },
-    ],
-  },
-  { id: "readme.md", name: "readme.md", kind: "file" },
-];
 
 export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   const minWidth = options.minWidth ?? 136;
@@ -63,17 +34,28 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   tree.setAttribute("role", "tree");
   tree.tabIndex = 0;
 
-  const nodes = signal<XplorerNode[]>(
-    cloneNodes(options.nodes ?? defaultNodes),
-  );
-  const expanded = new Set<string>(folderIds(nodes.get()));
+  const nodes = signal<XplorerNode[]>(cloneNodes(options.nodes ?? []));
+  const emptyText = signal("Please select a space");
+  const expanded = new Set<string>();
   let draggedId: string | undefined;
+  let loadVersion = 0;
 
   const renderTree = () => {
-    tree.replaceChildren(...nodes.get().map((node) => renderNode(node, 0)));
+    const currentNodes = nodes.get();
+    if (!currentNodes.length) {
+      if (!emptyText.get()) {
+        tree.replaceChildren();
+        return;
+      }
+      const empty = el("p", "nb-xplorer__empty", emptyText.get());
+      tree.replaceChildren(empty);
+      return;
+    }
+    tree.replaceChildren(...currentNodes.map((node) => renderNode(node, 0)));
   };
 
   scope.add(nodes.subscribe(renderTree));
+  scope.add(emptyText.subscribe(renderTree));
 
   scope.add(
     delegate(root, "click", "[data-xplorer-toggle]", (_event, target) => {
@@ -81,7 +63,18 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       if (!id) return;
       if (expanded.has(id)) expanded.delete(id);
       else expanded.add(id);
+      void persistExpanded();
       renderTree();
+    }),
+  );
+
+  scope.add(
+    delegate(root, "click", "[data-xplorer-row]", (_event, target) => {
+      const id = target.getAttribute("data-xplorer-row");
+      if (!id) return;
+      const node = findNode(nodes.get(), id);
+      if (!node || node.kind !== "file") return;
+      options.onOpenFile?.(node);
     }),
   );
 
@@ -97,6 +90,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
         keyboardEvent.preventDefault();
         if (expanded.has(id)) expanded.delete(id);
         else expanded.add(id);
+        void persistExpanded();
         renderTree();
       }
     }),
@@ -149,6 +143,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       const targetId = target.getAttribute("data-xplorer-folder");
       if (!draggedId || !targetId) return;
       expanded.add(targetId);
+      void persistExpanded();
       nodes.set(moveNode(nodes.get(), draggedId, targetId));
       draggedId = undefined;
       root.classList.remove("is-dragging");
@@ -196,7 +191,59 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
 
   root.append(header, tree, resizeHandle);
   renderTree();
+  void loadSpaceItems();
+
+  const onSpacesChanged = () => void loadSpaceItems();
+  window.addEventListener("spaces:changed", onSpacesChanged);
+  scope.add({
+    dispose() {
+      window.removeEventListener("spaces:changed", onSpacesChanged);
+    },
+  });
+
   return root;
+
+  async function loadSpaceItems() {
+    const version = ++loadVersion;
+    let selected: Space | undefined;
+    try {
+      selected = await window.spaces.selected();
+      if (version !== loadVersion) return;
+    } catch {
+      if (version !== loadVersion) return;
+      expanded.clear();
+      emptyText.set("Please select a space");
+      nodes.set([]);
+      return;
+    }
+
+    if (!selected) {
+      expanded.clear();
+      emptyText.set("Please select a space");
+      nodes.set([]);
+      return;
+    }
+
+    let items: XplorerNode[];
+    try {
+      items = await window.spaces.items();
+    } catch {
+      items = [];
+    }
+    if (version !== loadVersion) return;
+
+    const folderIdSet = new Set(folderIds(items));
+    expanded.clear();
+    for (const id of selected.xplorerExpandedIds ?? []) {
+      if (folderIdSet.has(id)) expanded.add(id);
+    }
+    emptyText.set("");
+    nodes.set(items);
+  }
+
+  async function persistExpanded() {
+    await window.spaces.setXplorerExpandedIds([...expanded]);
+  }
 
   function renderNode(node: XplorerNode, depth: number): HTMLElement {
     const item = el("div", "nb-xplorer__item");

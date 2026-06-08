@@ -4,7 +4,9 @@ import type {
   ComponentThemeInput,
   DropdownSelectEventDetail,
   LayoutDocument,
+  LayoutNodeId,
   LayoutTransaction,
+  StackNode,
 } from "@nodebody/ui";
 import {
   Scope,
@@ -20,6 +22,7 @@ import {
   graphFolderIcon,
   applyComponentTheme,
 } from "@nodebody/ui";
+import { createMarkdownEditor, gfmMarkdownOptions } from "@nodebody/editor-markdown";
 import { shouldShowWelcomeOnStartup, welcomeView } from "../pages/welcome";
 import type { ActivityItem, SidebarSide } from "./sidebar";
 import { createSidebar } from "./sidebar";
@@ -110,6 +113,10 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           onResize(width) {
             xplorerWidth.set(width);
           },
+          onOpenFile(node) {
+            if (!node.name.toLowerCase().endsWith(".md")) return;
+            void openMarkdownFile(node.id, node.name);
+          },
         },
         scope,
       );
@@ -125,6 +132,12 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       paneMount.className = "nb-pane-mount";
       root.replaceChildren(toolbar, sidebar, xplorer, paneMount);
       scope.add(mount(statusBar, root));
+      const savingTabIds = new Set<string>();
+      const setTabSavingState = (tabId: string, saving: boolean) => {
+        if (saving) savingTabIds.add(tabId);
+        else savingTabIds.delete(tabId);
+        applyTabSavingStates(root, savingTabIds);
+      };
       const layoutRenderer = scope.add(
         new LayoutRenderer({
           addTab: (stackId) => layout.set(addEmptyTab(layout.get(), stackId)),
@@ -141,6 +154,7 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       scope.add(
         layout.subscribe(() => {
           layoutRenderer.update(layout.get());
+          applyTabSavingStates(root, savingTabIds);
         }),
       );
 
@@ -223,12 +237,194 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           );
         }),
       );
+
+      async function openMarkdownFile(filePath: string, title: string) {
+        const currentLayout = layout.get();
+        const stackId = findActiveStackId(currentLayout);
+        if (!stackId) return;
+
+        const tabId = markdownTabId(filePath);
+        const existing = currentLayout.tabs[tabId];
+        if (existing) {
+          const existingStackId =
+            findStackContainingTab(currentLayout, tabId) ?? stackId;
+          layout.set(
+            applyLayoutTransaction(currentLayout, {
+              type: "activateTab",
+              stackId: existingStackId,
+              tabId,
+            }),
+          );
+          return;
+        }
+
+        const initialText = await window.spaces.readItem(filePath);
+        const pageId = `page:${tabId}`;
+        const contentId = `content:${tabId}`;
+
+        layout.set(
+          applyLayoutTransaction(layout.get(), {
+            type: "openTab",
+            stackId,
+            tab: {
+              id: tabId,
+              title,
+              resource: `file://${filePath}`,
+              page: pageId,
+              closable: true,
+            },
+            page: {
+              kind: "content",
+              id: pageId,
+              contentId,
+            },
+            content: {
+              id: contentId,
+              kind: "markdown",
+              resource: `file://${filePath}`,
+              view: createAutosavingMarkdownEditor({
+                filePath,
+                title,
+                initialText,
+                setSaving(saving) {
+                  setTabSavingState(tabId, saving);
+                },
+              }),
+            },
+            activate: true,
+          }),
+        );
+      }
     },
   };
 }
 
 function closeWindow() {
   window.win.close();
+}
+
+interface AutosavingMarkdownOptions {
+  filePath: string;
+  title: string;
+  initialText: string;
+  setSaving: (saving: boolean) => void;
+}
+
+function createAutosavingMarkdownEditor(
+  options: AutosavingMarkdownOptions,
+): Component {
+  return {
+    mount(root, scope) {
+      let saveTimer: number | undefined;
+      let saving = false;
+      let pendingText: string | undefined;
+      let lastSavedText = options.initialText;
+
+      const flush = () => {
+        if (saving) return;
+        const value = pendingText;
+        pendingText = undefined;
+        if (value === undefined || value === lastSavedText) {
+          options.setSaving(false);
+          return;
+        }
+
+        saving = true;
+        void window.spaces
+          .writeItem(options.filePath, value)
+          .then(() => {
+            lastSavedText = value;
+          })
+          .finally(() => {
+            saving = false;
+            if (pendingText !== undefined && pendingText !== lastSavedText) {
+              saveTimer = window.setTimeout(flush, 0);
+            } else {
+              pendingText = undefined;
+              options.setSaving(false);
+            }
+          });
+      };
+
+      const editor = createMarkdownEditor({
+        document: {
+          id: options.filePath,
+          title: options.title,
+          resource: `file://${options.filePath}`,
+          initialText: options.initialText,
+        },
+        markdown: gfmMarkdownOptions(),
+        onChange(event) {
+          pendingText = event.value;
+          options.setSaving(true);
+          if (saveTimer !== undefined) window.clearTimeout(saveTimer);
+          saveTimer = window.setTimeout(flush, 600);
+        },
+      });
+
+      scope.add(mount(editor, root));
+      scope.add(
+        disposable(() => {
+          if (saveTimer !== undefined) window.clearTimeout(saveTimer);
+          options.setSaving(false);
+        }),
+      );
+    },
+  };
+}
+
+function applyTabSavingStates(root: ParentNode, savingTabIds: Set<string>) {
+  for (const tab of root.querySelectorAll<HTMLElement>("[data-tab]")) {
+    const saving = savingTabIds.has(tab.dataset.tab ?? "");
+    if (saving) tab.dataset.saving = "true";
+    else delete tab.dataset.saving;
+    const close = tab.querySelector<HTMLButtonElement>(".nb-tab__close");
+    close?.setAttribute(
+      "aria-label",
+      saving ? "Saving" : `Close ${tabTitle(tab)}`,
+    );
+    close?.setAttribute("title", saving ? "Saving" : `Close ${tabTitle(tab)}`);
+  }
+}
+
+function tabTitle(tab: HTMLElement) {
+  return tab.querySelector(".nb-tab__label")?.textContent?.trim() ?? "tab";
+}
+
+function markdownTabId(filePath: string) {
+  return `markdown:${encodeURIComponent(filePath)}`;
+}
+
+function findActiveStackId(doc: LayoutDocument): LayoutNodeId | undefined {
+  const fromRoot = findFirstStack(doc, doc.root);
+  return fromRoot?.id;
+}
+
+function findStackContainingTab(
+  doc: LayoutDocument,
+  tabId: string,
+): LayoutNodeId | undefined {
+  for (const node of Object.values(doc.nodes)) {
+    if (node.kind === "stack" && node.tabIds.includes(tabId)) return node.id;
+  }
+  return undefined;
+}
+
+function findFirstStack(
+  doc: LayoutDocument,
+  nodeId: LayoutNodeId,
+): StackNode | undefined {
+  const node = doc.nodes[nodeId];
+  if (!node) return undefined;
+  if (node.kind === "stack") return node;
+  if (node.kind === "content") return undefined;
+
+  for (const childId of node.childIds) {
+    const stack = findFirstStack(doc, childId);
+    if (stack) return stack;
+  }
+
+  return undefined;
 }
 
 function updateActivityButtons(
@@ -404,6 +600,15 @@ function clonePanes(panes: PaneModel[]) {
 
 function withStartupWelcome(panes: PaneModel[]) {
   if (!shouldShowWelcomeOnStartup()) return panes;
+  if (
+    panes.some((pane) =>
+      pane.tabs.some(
+        (tab) => tab.id === "welcome" || tab.resource === "nodebody://welcome",
+      ),
+    )
+  ) {
+    return panes;
+  }
 
   const welcomeTab = {
     id: "welcome",
