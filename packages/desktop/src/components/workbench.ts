@@ -21,6 +21,7 @@ import {
   getHotkeyManager,
   graphFolderIcon,
   applyComponentTheme,
+  el,
 } from "@nodebody/ui";
 import { createMarkdownEditor, gfmMarkdownOptions } from "@nodebody/editor-markdown";
 import { shouldShowWelcomeOnStartup, welcomeView } from "../pages/welcome";
@@ -114,8 +115,7 @@ export function workbench(options: WorkbenchOptions = {}): Component {
             xplorerWidth.set(width);
           },
           onOpenFile(node) {
-            if (!node.name.toLowerCase().endsWith(".md")) return;
-            void openMarkdownFile(node.id, node.name);
+            void openSpaceFile(node.id, node.name);
           },
         },
         scope,
@@ -238,6 +238,17 @@ export function workbench(options: WorkbenchOptions = {}): Component {
         }),
       );
 
+      async function openSpaceFile(filePath: string, title: string) {
+        if (isMarkdownFile(title)) {
+          await openMarkdownFile(filePath, title);
+          return;
+        }
+
+        if (isImageFile(title)) {
+          await openImageFile(filePath, title);
+        }
+      }
+
       async function openMarkdownFile(filePath: string, title: string) {
         const currentLayout = layout.get();
         const stackId = findActiveStackId(currentLayout);
@@ -290,6 +301,57 @@ export function workbench(options: WorkbenchOptions = {}): Component {
                   setTabSavingState(tabId, saving);
                 },
               }),
+            },
+            activate: true,
+          }),
+        );
+      }
+
+      async function openImageFile(filePath: string, title: string) {
+        const currentLayout = layout.get();
+        const stackId = findActiveStackId(currentLayout);
+        if (!stackId) return;
+
+        const tabId = imageTabId(filePath);
+        const existing = currentLayout.tabs[tabId];
+        if (existing) {
+          const existingStackId =
+            findStackContainingTab(currentLayout, tabId) ?? stackId;
+          layout.set(
+            applyLayoutTransaction(currentLayout, {
+              type: "activateTab",
+              stackId: existingStackId,
+              tabId,
+            }),
+          );
+          return;
+        }
+
+        const dataUrl = await window.spaces.readItemDataUrl(filePath);
+        const pageId = `page:${tabId}`;
+        const contentId = `content:${tabId}`;
+
+        layout.set(
+          applyLayoutTransaction(layout.get(), {
+            type: "openTab",
+            stackId,
+            tab: {
+              id: tabId,
+              title,
+              resource: `file://${filePath}`,
+              page: pageId,
+              closable: true,
+            },
+            page: {
+              kind: "content",
+              id: pageId,
+              contentId,
+            },
+            content: {
+              id: contentId,
+              kind: "image",
+              resource: `file://${filePath}`,
+              view: createImageViewer({ title, src: dataUrl }),
             },
             activate: true,
           }),
@@ -393,6 +455,58 @@ function tabTitle(tab: HTMLElement) {
 
 function markdownTabId(filePath: string) {
   return `markdown:${encodeURIComponent(filePath)}`;
+}
+
+function imageTabId(filePath: string) {
+  return `image:${encodeURIComponent(filePath)}`;
+}
+
+function isMarkdownFile(fileName: string) {
+  return fileName.toLowerCase().endsWith(".md");
+}
+
+function isImageFile(fileName: string) {
+  return imageFileExtensions.has(fileExtension(fileName));
+}
+
+function fileExtension(fileName: string) {
+  const index = fileName.lastIndexOf(".");
+  return index >= 0 ? fileName.slice(index).toLowerCase() : "";
+}
+
+const imageFileExtensions = new Set([
+  ".apng",
+  ".avif",
+  ".bmp",
+  ".gif",
+  ".ico",
+  ".jfif",
+  ".jpeg",
+  ".jpg",
+  ".pjpeg",
+  ".pjp",
+  ".png",
+  ".svg",
+  ".webp",
+]);
+
+interface ImageViewerOptions {
+  title: string;
+  src: string;
+}
+
+function createImageViewer(options: ImageViewerOptions): Component {
+  return {
+    mount(root) {
+      const viewer = el("div", "nb-image-viewer");
+      const image = el("img", "nb-image-viewer__image") as HTMLImageElement;
+      image.src = options.src;
+      image.alt = options.title;
+      image.draggable = false;
+      viewer.append(image);
+      root.replaceChildren(viewer);
+    },
+  };
 }
 
 function findActiveStackId(doc: LayoutDocument): LayoutNodeId | undefined {

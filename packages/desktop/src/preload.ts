@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld("spaces", {
   setXplorerExpandedIds: (ids: string[]) =>
     ipcRenderer.invoke("spaces:setXplorerExpandedIds", ids),
   readItem: (itemPath: string) => ipcRenderer.invoke("spaces:readItem", itemPath),
+  readItemDataUrl: (itemPath: string) =>
+    ipcRenderer.invoke("spaces:readItemDataUrl", itemPath),
   writeItem: (itemPath: string, value: string) =>
     ipcRenderer.invoke("spaces:writeItem", itemPath, value),
   create: (directoryPath: string) =>

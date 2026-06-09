@@ -64,6 +64,12 @@ export function registerSpacesIpc() {
     return fs.readFile(resolved, "utf8");
   });
 
+  ipcMain.handle("spaces:readItemDataUrl", async (_event, itemPath: string) => {
+    const resolved = assertActiveSpaceItemPath(itemPath);
+    const data = await fs.readFile(resolved);
+    return `data:${mimeTypeForPath(resolved)};base64,${data.toString("base64")}`;
+  });
+
   ipcMain.handle(
     "spaces:writeItem",
     async (_event, itemPath: string, value: string) => {
@@ -119,4 +125,33 @@ function assertActiveSpaceItemPath(itemPath: string) {
   }
 
   return resolved;
+}
+
+function mimeTypeForPath(itemPath: string) {
+  switch (path.extname(itemPath).toLowerCase()) {
+    case ".apng":
+      return "image/apng";
+    case ".avif":
+      return "image/avif";
+    case ".bmp":
+      return "image/bmp";
+    case ".gif":
+      return "image/gif";
+    case ".ico":
+      return "image/x-icon";
+    case ".jpg":
+    case ".jpeg":
+    case ".jfif":
+    case ".pjpeg":
+    case ".pjp":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".svg":
+      return "image/svg+xml";
+    case ".webp":
+      return "image/webp";
+    default:
+      return "application/octet-stream";
+  }
 }
