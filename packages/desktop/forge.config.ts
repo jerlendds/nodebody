@@ -17,22 +17,22 @@ const makers: ForgeConfig["makers"] = [
   new MakerSquirrel({}),
   new MakerZIP({}, ["darwin", "linux", "windows"]),
   new MakerDeb({}),
-  new MakerDMG(
-    {
-      title: "InterfaceZ",
-      icon: "./src/assets/images/logo.png",
-      background: "./src/assets/images/dmg-background.png",
-      format: "ULFO",
-    },
-    ["darwin"],
-  ),
-  new MakerPKG(
-    {
-      name: "InterfaceZ",
-      icon: "./src/assets/images/logo.png",
-    },
-    ["darwin"],
-  ),
+  // TODO: Fix `FAILED: No identity found for signing.` error in github actions workflow
+  // new MakerDMG(
+  //   {
+  //     title: "InterfaceZ",
+  //     icon: "./src/assets/images/logo.png",
+  //     background: "./src/assets/images/dmg-background.png",
+  //     format: "ULFO",
+  //   },
+  //   ["darwin"],
+  // ),
+  // new MakerPKG(
+  //   {
+  //     name: "InterfaceZ",
+  //   },
+  //   ["darwin"],
+  // ),
   new MakerMSIX({
     manifestVariables: {
       publisher: "CN=interfacez",
