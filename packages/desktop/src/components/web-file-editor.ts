@@ -117,12 +117,16 @@ declare module "react" {
     ref?: unknown;
   }
   export type ComponentProps<T> = T extends JSXElementConstructor<infer P> ? P : never;
+  export const Fragment: unique symbol;
+  export const StrictMode: unique symbol;
   export function createElement(type: unknown, props?: unknown, ...children: unknown[]): unknown;
   export function useEffect(effect: () => void | (() => void), deps?: unknown[]): void;
   export function useMemo<T>(factory: () => T, deps?: unknown[]): T;
   export function useRef<T>(initialValue: T): { current: T };
   export function useState<T>(initialValue: T): [T, (value: T | ((current: T) => T)) => void];
   const React: {
+    Fragment: typeof Fragment;
+    StrictMode: typeof StrictMode;
     createElement: typeof createElement;
     useEffect: typeof useEffect;
     useMemo: typeof useMemo;
@@ -168,13 +172,21 @@ export function createWebFileEditor(options: WebFileEditorOptions): Component {
       const host = el("div", "nb-web-file-editor");
       root.replaceChildren(host);
 
+      const initialText = stripWebFileArtifacts(options.initialText);
       let saveTimer: number | undefined;
       let saving = false;
       let pendingText: string | undefined;
-      let lastSavedText = options.initialText;
+      let lastSavedText = initialText;
+
+      if (initialText !== options.initialText) {
+        options.setSaving(true);
+        void window.spaces.writeItem(options.filePath, initialText).finally(() => {
+          options.setSaving(false);
+        });
+      }
 
       const model = monaco.editor.createModel(
-        options.initialText,
+        initialText,
         languageForPath(options.title),
         monaco.Uri.file(options.filePath),
       );
@@ -196,7 +208,8 @@ export function createWebFileEditor(options: WebFileEditorOptions): Component {
 
       const flush = () => {
         if (saving) return;
-        const value = pendingText;
+        const value =
+          pendingText === undefined ? undefined : stripWebFileArtifacts(pendingText);
         pendingText = undefined;
         if (value === undefined || value === lastSavedText) {
           options.setSaving(false);
@@ -226,7 +239,25 @@ export function createWebFileEditor(options: WebFileEditorOptions): Component {
       };
 
       const change = model.onDidChangeContent(() => {
-        pendingText = model.getValue();
+        const nextText = model.getValue();
+        const sanitizedText = stripWebFileArtifacts(nextText);
+        if (sanitizedText !== nextText) {
+          const position = editor.getPosition();
+          model.pushEditOperations(
+            editor.getSelections(),
+            [
+              {
+                range: model.getFullModelRange(),
+                text: sanitizedText,
+              },
+            ],
+            () => null,
+          );
+          if (position) editor.setPosition(position);
+          return;
+        }
+
+        pendingText = sanitizedText;
         options.setSaving(true);
         if (saveTimer !== undefined) window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(flush, autosaveDebounceMs);
@@ -341,6 +372,13 @@ function configureMonaco() {
   );
 }
 
+function stripWebFileArtifacts(value: string) {
+  return value.replace(
+    /web-(?:file|project):%2F[^\s"'<>`)]*?\$\d+/g,
+    "",
+  );
+}
+
 const tsxSemanticTokenTypes = ["tag", "attribute.name", "attribute.value", "text"];
 
 function registerTsxSemanticTokens() {
@@ -360,8 +398,14 @@ function registerTsxSemanticTokens() {
     releaseDocumentSemanticTokens() {},
   };
 
-  monaco.languages.registerDocumentSemanticTokensProvider("typescript", provider);
-  monaco.languages.registerDocumentSemanticTokensProvider("javascript", provider);
+  monaco.languages.registerDocumentSemanticTokensProvider(
+    { exclusive: true, language: "typescript", pattern: "**/*.tsx" },
+    provider,
+  );
+  monaco.languages.registerDocumentSemanticTokensProvider(
+    { exclusive: true, language: "javascript", pattern: "**/*.jsx" },
+    provider,
+  );
 }
 
 interface SemanticTokenRange {

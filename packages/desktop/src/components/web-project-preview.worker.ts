@@ -59,6 +59,12 @@ const allowedScriptOrigins = new Set([
   "https://ga.jspm.io",
 ]);
 
+const allowedStyleOrigins = new Set([
+  "https://fonts.googleapis.com",
+  "https://cdn.jsdelivr.net",
+  "https://unpkg.com",
+]);
+
 let initializePromise: Promise<void> | undefined;
 
 self.addEventListener("message", (event: MessageEvent<BuildRequest>) => {
@@ -109,11 +115,14 @@ async function buildPreview(project: ProjectState): Promise<BuildOutput> {
     diagnostics.push(...result.diagnostics);
   }
 
-  const finalCss = `${cssModel.css}\n${bundledCss}`.trim();
+  const finalCss = hoistCssImports(
+    `${htmlModel?.headCss ?? ""}\n${cssModel.css}\n${bundledCss}`.trim(),
+  );
   return {
     html: generatePreviewHtml({
       body: htmlModel?.body ?? '<div id="root"></div>',
       css: finalCss,
+      externalStyles: htmlModel?.externalStyles ?? [],
       importMap,
       script,
     }),
@@ -216,7 +225,9 @@ function virtualProjectPlugin(project: ProjectState): esbuild.Plugin {
 }
 
 function parseHtmlEntry(project: ProjectState, file: ProjectFile) {
+  const headMatch = file.content.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
   const bodyMatch = file.content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const headSource = headMatch?.[1] ?? "";
   const bodySource = bodyMatch?.[1] ?? file.content;
   const scriptMatch = bodySource.match(
     /<script\b(?=[^>]*\btype=["']module["'])(?=[^>]*\bsrc=["']([^"']+)["'])[^>]*><\/script>/i,
@@ -227,8 +238,87 @@ function parseHtmlEntry(project: ProjectState, file: ProjectFile) {
     : undefined;
   return {
     body: body || '<div id="root"></div>',
+    externalStyles: externalStylesFromHead(headSource),
+    headCss: inlineStylesFromHead(headSource),
     scriptPath,
   };
+}
+
+function inlineStylesFromHead(head: string) {
+  if (typeof DOMParser === "undefined") return inlineStylesFromHeadFallback(head);
+
+  const doc = new DOMParser().parseFromString(
+    `<!doctype html><html><head>${head}</head><body></body></html>`,
+    "text/html",
+  );
+  return Array.from(doc.querySelectorAll("style"))
+    .map((style) => style.textContent?.trim() ?? "")
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function inlineStylesFromHeadFallback(head: string) {
+  const styles: string[] = [];
+  const stylePattern = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = stylePattern.exec(head))) {
+    const css = match[1]?.trim();
+    if (css) styles.push(css);
+  }
+
+  return styles.join("\n\n");
+}
+
+function externalStylesFromHead(head: string) {
+  if (typeof DOMParser === "undefined") return externalStylesFromHeadFallback(head);
+
+  const doc = new DOMParser().parseFromString(
+    `<!doctype html><html><head>${head}</head><body></body></html>`,
+    "text/html",
+  );
+  const styles: string[] = [];
+
+  for (const link of doc.querySelectorAll<HTMLLinkElement>(
+    'link[rel~="stylesheet"][href]',
+  )) {
+    const href = link.href;
+    if (!allowedStylesheetUrl(href)) continue;
+    styles.push(href);
+  }
+
+  return styles;
+}
+
+function externalStylesFromHeadFallback(head: string) {
+  const styles: string[] = [];
+  const linkPattern = /<link\b[^>]*>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = linkPattern.exec(head))) {
+    const tag = match[0];
+    const rel = htmlAttributeValue(tag, "rel")?.toLowerCase();
+    const href = htmlAttributeValue(tag, "href");
+    if (!href || !rel?.split(/\s+/).includes("stylesheet")) continue;
+    if (!allowedStylesheetUrl(href)) continue;
+    styles.push(href);
+  }
+
+  return styles;
+}
+
+function htmlAttributeValue(tag: string, name: string) {
+  const pattern = new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`, "i");
+  return tag.match(pattern)?.[2];
+}
+
+function allowedStylesheetUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && allowedStyleOrigins.has(url.origin);
+  } catch {
+    return false;
+  }
 }
 
 function findScriptEntry(project: ProjectState) {
@@ -261,6 +351,16 @@ function collectCss(project: ProjectState) {
     })
     .join("\n\n");
   return { css, rules };
+}
+
+function hoistCssImports(css: string) {
+  const imports: string[] = [];
+  const body = css.replace(/^[ \t]*@import\b[^\r\n]*(?:\r?\n|$)/gim, (match) => {
+    imports.push(match.trim());
+    return "";
+  });
+
+  return [...new Set(imports), body.trim()].filter(Boolean).join("\n\n");
 }
 
 function buildImportMap(dependencies: Record<string, string>) {
@@ -323,17 +423,23 @@ function resolveDependency(dep: {
 function generatePreviewHtml(input: {
   body: string;
   css: string;
+  externalStyles: string[];
   importMap: { imports: Record<string, string> };
   script: string;
 }) {
+  const externalStyles = input.externalStyles
+    .map((href) => `  <link rel="stylesheet" href="${escapeAttribute(href)}" />`)
+    .join("\n");
+
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="${escapeHtml(buildPreviewCsp())}" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+${externalStyles ? `${externalStyles}\n` : ""}\
   <script type="importmap">${escapeScriptText(JSON.stringify(input.importMap, null, 2))}</script>
-  <style id="__preview_css__">${escapeHtml(input.css)}</style>
+  <style id="__preview_css__">${escapeStyleText(input.css)}</style>
 </head>
 <body>
   ${input.body}
@@ -347,10 +453,10 @@ function buildPreviewCsp() {
   return [
     "default-src 'none'",
     "script-src 'unsafe-inline' https://esm.sh https://esm.run https://cdn.jsdelivr.net https://unpkg.com https://ga.jspm.io",
-    "style-src 'unsafe-inline' https:",
+    "style-src 'unsafe-inline' https: https://fonts.googleapis.com",
     "img-src data: blob: https:",
-    "font-src data: https:",
-    "connect-src https://esm.sh https://esm.run https://cdn.jsdelivr.net https://unpkg.com https://ga.jspm.io",
+    "font-src data: https: https://fonts.gstatic.com",
+    "connect-src https://esm.sh https://esm.run https://cdn.jsdelivr.net https://unpkg.com https://ga.jspm.io https://fonts.googleapis.com https://fonts.gstatic.com",
     "media-src blob: data: https:",
     "frame-src 'none'",
     "object-src 'none'",
@@ -662,10 +768,6 @@ function stableHash(value: string) {
   return (hash >>> 0).toString(36);
 }
 
-function escapeAttribute(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-}
-
 function externalSpecifiers(dependencies: Record<string, string>) {
   const external = new Set<string>();
   for (const name of Object.keys(dependencies)) {
@@ -774,6 +876,16 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+function escapeAttribute(value: string) {
+  return escapeHtml(value);
+}
+
+function escapeStyleText(value: string) {
+  return value
+    .replace(/<\/style/gi, "<\\/style")
+    .replace(/<!--/g, "<\\!--");
 }
 
 function escapeScriptText(value: string) {

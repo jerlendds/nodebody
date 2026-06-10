@@ -138,6 +138,7 @@ export function createWebProjectPreview(
       ) as HTMLIFrameElement;
       const overlay = el("div", "nb-web-project__overlay");
       const hoverBox = el("div", "nb-web-project__inspect-box");
+      const selectedBox = el("div", "nb-web-project__active-inspect-box");
       const toolbar = el("div", "nb-web-project__toolbar");
       const inspectButton = el(
         "button",
@@ -146,20 +147,20 @@ export function createWebProjectPreview(
       ) as HTMLButtonElement;
       const inspectorPanel = el("aside", "nb-web-project__inspector");
       const diagnostics = el("div", "nb-web-project__diagnostics");
-      const status = el("div", "nb-web-project__status", "Loading preview...");
       const consoleOutput = el("div", "nb-web-project__console-output");
 
       preview.sandbox.add("allow-scripts");
       preview.referrerPolicy = "no-referrer";
+      hoverBox.hidden = true;
+      selectedBox.hidden = true;
       toolbar.append(inspectButton);
-      overlay.append(hoverBox);
+      overlay.append(hoverBox, selectedBox);
       shell.append(
         preview,
         overlay,
         toolbar,
         inspectorPanel,
         diagnostics,
-        status,
         consoleOutput,
       );
       root.replaceChildren(shell);
@@ -179,7 +180,6 @@ export function createWebProjectPreview(
           if (response.requestId !== buildRequestId) return;
           if (response.type === "failure") {
             renderDiagnostics(response.diagnostics);
-            status.textContent = "Preview build failed";
             return;
           }
           latestBuild = response.output;
@@ -192,7 +192,6 @@ export function createWebProjectPreview(
           } else {
             preview.srcdoc = response.output.html;
           }
-          status.textContent = "Preview ready";
           pendingBuildMode = undefined;
         },
       );
@@ -213,7 +212,8 @@ export function createWebProjectPreview(
         );
         if (!inspectMode) {
           selectedElement = undefined;
-          positionOverlay();
+          positionHoverOverlay();
+          positionSelectedOverlay();
           renderInspectorPanel();
         }
       };
@@ -231,14 +231,15 @@ export function createWebProjectPreview(
           preview.contentWindow?.postMessage({ type: "inspector-enable" }, "*");
         }
         if (event.data.type === "inspect-hover") {
-          positionOverlay(event.data.box);
+          positionHoverOverlay(event.data.box);
         }
         if (event.data.type === "inspect-hover-clear") {
-          positionOverlay();
+          positionHoverOverlay();
         }
         if (event.data.type === "inspect-select") {
           selectedElement = sanitizeInspectedPayload(event.data.payload);
-          positionOverlay(selectedElement?.box);
+          positionHoverOverlay();
+          positionSelectedOverlay(selectedElement?.box);
           renderInspectorPanel();
         }
         if (event.data.type === "runtime-error") {
@@ -276,7 +277,6 @@ export function createWebProjectPreview(
           latestProject = project;
           buildRequestId += 1;
           pendingBuildMode = mode;
-          status.textContent = "Building preview...";
           buildWorker.postMessage({
             type: "build",
             requestId: buildRequestId,
@@ -284,7 +284,6 @@ export function createWebProjectPreview(
             mode,
           });
         } catch (error) {
-          status.textContent = "Preview build failed";
           renderDiagnostics([{ text: errorMessage(error) }]);
         }
       }
@@ -306,7 +305,7 @@ export function createWebProjectPreview(
         consoleOutput.append(row);
       }
 
-      function positionOverlay(box?: PreviewBox) {
+      function positionHoverOverlay(box?: PreviewBox) {
         if (!box || !inspectMode) {
           hoverBox.removeAttribute("style");
           hoverBox.hidden = true;
@@ -317,6 +316,20 @@ export function createWebProjectPreview(
         hoverBox.style.top = `${box.top}px`;
         hoverBox.style.width = `${box.width}px`;
         hoverBox.style.height = `${box.height}px`;
+      }
+
+      function positionSelectedOverlay(box?: PreviewBox) {
+        if (!box || !inspectMode || !selectedElement) {
+          selectedBox.removeAttribute("style");
+          selectedBox.hidden = true;
+          return;
+        }
+
+        selectedBox.hidden = false;
+        selectedBox.style.left = `${box.left - selectedOverlayPadding}px`;
+        selectedBox.style.top = `${box.top - selectedOverlayPadding}px`;
+        selectedBox.style.width = `${box.width + selectedOverlayPadding * 2}px`;
+        selectedBox.style.height = `${box.height + selectedOverlayPadding * 2}px`;
       }
 
       function renderInspectorPanel() {
@@ -373,9 +386,7 @@ export function createWebProjectPreview(
           const control = el("div", "nb-web-project__style-control");
           const input = el("input", "nb-web-project__style-input") as HTMLInputElement;
           input.value = selectedElement.computedStyle[property] ?? "";
-          input.addEventListener("change", () => {
-            void patchSelectedCss(property, input.value);
-          });
+          bindStyleInputAutosave(input, property);
           control.append(input);
 
           if (isColorStyleProperty(property) && parseColorOrUndefined(input.value)) {
@@ -526,9 +537,28 @@ export function createWebProjectPreview(
           }),
         );
       }
+
+      function bindStyleInputAutosave(input: HTMLInputElement, property: string) {
+        let saveTimer: number | undefined;
+        let lastQueuedValue = input.value;
+
+        const queueSave = () => {
+          lastQueuedValue = input.value;
+          if (saveTimer !== undefined) window.clearTimeout(saveTimer);
+          saveTimer = window.setTimeout(() => {
+            void patchSelectedCss(property, lastQueuedValue);
+          }, inspectorAutosaveDebounceMs);
+        };
+
+        input.addEventListener("input", queueSave);
+        input.addEventListener("change", queueSave);
+      }
     },
   };
 }
+
+const selectedOverlayPadding = 3;
+const inspectorAutosaveDebounceMs = 220;
 
 const editableStyleProperties = [
   "display",

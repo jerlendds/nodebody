@@ -73,7 +73,10 @@ export function registerSpacesIpc() {
   ipcMain.handle("spaces:readItem", async (_event, itemPath: string) => {
     await getActiveSpacePath();
     const resolved = assertActiveSpaceItemPath(itemPath);
-    return fs.readFile(resolved, "utf8");
+    const value = await fs.readFile(resolved, "utf8");
+    const sanitized = stripWebFileArtifacts(value);
+    if (sanitized !== value) await fs.writeFile(resolved, sanitized, "utf8");
+    return sanitized;
   });
 
   ipcMain.handle("spaces:readItemDataUrl", async (_event, itemPath: string) => {
@@ -188,8 +191,15 @@ export function registerSpacesIpc() {
     async (_event, itemPath: string, value: string) => {
       await getActiveSpacePath();
       const resolved = assertActiveSpaceItemPath(itemPath);
-      await fs.writeFile(resolved, value, "utf8");
+      await fs.writeFile(resolved, stripWebFileArtifacts(value), "utf8");
     },
+  );
+}
+
+function stripWebFileArtifacts(value: string) {
+  return value.replace(
+    /web-(?:file|project):%2F[^\s"'<>`)]*?\$\d+/g,
+    "",
   );
 }
 
