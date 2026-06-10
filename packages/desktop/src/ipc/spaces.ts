@@ -18,6 +18,7 @@ export interface SpaceItem {
   id: string;
   name: string;
   kind: "folder" | "file";
+  web?: boolean;
   children?: SpaceItem[];
 }
 
@@ -98,6 +99,46 @@ export function registerSpacesIpc() {
   );
 
   ipcMain.handle(
+    "spaces:createWebFolder",
+    async (_event, parentPath: string, name: string) => {
+      const parent = assertActiveSpaceItemPath(parentPath);
+      await assertDirectory(parent);
+      const folderPath = childPath(parent, name);
+      await assertAvailable(folderPath);
+      await fs.mkdir(path.join(folderPath, ".web", "cache"), { recursive: true });
+      await fs.mkdir(path.join(folderPath, "src"), { recursive: true });
+      await Promise.all([
+        fs.writeFile(
+          path.join(folderPath, "index.html"),
+          webProjectIndexHtml(),
+          "utf8",
+        ),
+        fs.writeFile(
+          path.join(folderPath, "package.json"),
+          webProjectPackageJson(name),
+          "utf8",
+        ),
+        fs.writeFile(
+          path.join(folderPath, "src", "main.tsx"),
+          webProjectMainTsx(),
+          "utf8",
+        ),
+        fs.writeFile(
+          path.join(folderPath, "src", "App.tsx"),
+          webProjectAppTsx(),
+          "utf8",
+        ),
+        fs.writeFile(
+          path.join(folderPath, "src", "styles.css"),
+          webProjectStylesCss(),
+          "utf8",
+        ),
+      ]);
+      return folderPath;
+    },
+  );
+
+  ipcMain.handle(
     "spaces:renameItem",
     async (_event, itemPath: string, name: string) => {
       const resolved = assertActiveSpaceItemPath(itemPath);
@@ -153,11 +194,22 @@ async function listSpaceItems(spacePath: string): Promise<SpaceItem[]> {
         id,
         name: entry.name,
         kind: "folder",
+        web: await hasWebMarker(id),
         children: await listSpaceItems(id),
       };
     });
 
   return (await Promise.all(items)).sort(compareSpaceItems);
+}
+
+async function hasWebMarker(folderPath: string) {
+  try {
+    const stat = await fs.stat(path.join(folderPath, ".web"));
+    return stat.isDirectory();
+  } catch (error) {
+    if (isNotFoundError(error)) return false;
+    throw error;
+  }
 }
 
 function isHiddenSpaceItem(name: string) {
@@ -308,6 +360,140 @@ function childPath(parentPath: string, name: string) {
     throw new Error(`Name cannot include path separators: ${name}`);
   }
   return path.join(parentPath, cleanName);
+}
+
+function webProjectPackageJson(name: string) {
+  return `${JSON.stringify(
+    {
+      name: slugProjectName(name),
+      private: true,
+      type: "module",
+      dependencies: {
+        "@vitejs/plugin-react": "5.1.2",
+        react: "18.3.1",
+        "react-dom": "18.3.1",
+      },
+      devDependencies: {},
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+function webProjectIndexHtml() {
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web Project</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+`;
+}
+
+function webProjectMainTsx() {
+  return `import React from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./App";
+import "./styles.css";
+
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+`;
+}
+
+function webProjectAppTsx() {
+  return `export function App() {
+  return (
+    <main className="page">
+      <section className="card">
+        <span className="eyebrow">Nodebody Web</span>
+        <h1>You've created a web project!</h1>
+        <p>
+          Start shaping this preview from the files in your new web folder.
+        </p>
+      </section>
+    </main>
+  );
+}
+`;
+}
+
+function webProjectStylesCss() {
+  return `:root {
+  color: #f8fafc;
+  background: #101624;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 32px;
+  background:
+    radial-gradient(circle at top left, rgba(46, 161, 255, 0.28), transparent 34%),
+    linear-gradient(135deg, #101624 0%, #1b2540 48%, #0e1726 100%);
+}
+
+.card {
+  width: min(520px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+  padding: 32px;
+}
+
+.eyebrow {
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 12px 0 10px;
+  color: #ffffff;
+  font-size: 32px;
+  line-height: 1.08;
+}
+
+p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 15px;
+  line-height: 1.6;
+}
+`;
+}
+
+function slugProjectName(name: string) {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "web-project";
 }
 
 function isNotFoundError(error: unknown) {

@@ -14,7 +14,13 @@ const createWindow = () => {
     frame: false,
     titleBarStyle: "hidden",
     trafficLightPosition: { x: 12, y: 12 },
-    webPreferences: { preload },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload,
+      sandbox: true,
+      webSecurity: true,
+    },
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {

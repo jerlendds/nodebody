@@ -7,6 +7,18 @@ declare module "*.svg?raw" {
   export default content;
 }
 
+declare module "*?worker" {
+  const WorkerFactory: {
+    new (): Worker;
+  };
+  export default WorkerFactory;
+}
+
+declare module "*?url" {
+  const url: string;
+  export default url;
+}
+
 interface VersionsApi {
   chrome: () => string;
 }
@@ -32,6 +44,7 @@ interface SpaceItem {
   id: string;
   name: string;
   kind: "folder" | "file";
+  web?: boolean;
   children?: SpaceItem[];
 }
 
@@ -45,6 +58,7 @@ interface SpacesApi {
   relativeItemPath: (itemPath: string) => Promise<string>;
   createFile: (parentPath: string, name: string) => Promise<string>;
   createFolder: (parentPath: string, name: string) => Promise<string>;
+  createWebFolder: (parentPath: string, name: string) => Promise<string>;
   renameItem: (itemPath: string, name: string) => Promise<string>;
   deleteItem: (itemPath: string) => Promise<string>;
   writeItem: (itemPath: string, value: string) => Promise<void>;

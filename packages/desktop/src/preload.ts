@@ -40,6 +40,13 @@ contextBridge.exposeInMainWorld("spaces", {
         window.dispatchEvent(new CustomEvent("spaces:changed"));
         return itemPath;
       }),
+  createWebFolder: (parentPath: string, name: string) =>
+    ipcRenderer
+      .invoke("spaces:createWebFolder", parentPath, name)
+      .then((itemPath) => {
+        window.dispatchEvent(new CustomEvent("spaces:changed"));
+        return itemPath;
+      }),
   renameItem: (itemPath: string, name: string) =>
     ipcRenderer.invoke("spaces:renameItem", itemPath, name).then((nextPath) => {
       window.dispatchEvent(new CustomEvent("spaces:changed"));

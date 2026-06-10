@@ -16,6 +16,7 @@ export interface XplorerNode {
   id: string;
   name: string;
   kind: "folder" | "file";
+  web?: boolean;
   children?: XplorerNode[];
 }
 
@@ -26,6 +27,7 @@ export interface XplorerOptions {
   nodes?: XplorerNode[];
   onResize?: (width: number) => void;
   onOpenFile?: (node: XplorerNode) => void;
+  onOpenWebFolder?: (node: XplorerNode) => void;
   contextMenuContributors?: readonly XplorerContextMenuContribution[];
 }
 
@@ -44,6 +46,14 @@ let xplorerClipboard:
   | undefined;
 
 const globalContextMenuContributors: XplorerContextMenuContribution[] = [];
+const worldIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-world">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
+  <path d="M3.6 9h16.8" />
+  <path d="M3.6 15h16.8" />
+  <path d="M11.5 3a17 17 0 0 0 0 18" />
+  <path d="M12.5 3a17 17 0 0 1 0 18" />
+</svg>`;
 
 export function registerXplorerContextMenuContribution(
   contribution: XplorerContextMenuContribution,
@@ -79,6 +89,12 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   const expanded = new Set<string>();
   let draggedId: string | undefined;
   let loadVersion = 0;
+  let pendingWebFolder:
+    | {
+        parentId: string;
+        value: string;
+      }
+    | undefined;
 
   const renderTree = () => {
     const currentNodes = nodes.get();
@@ -92,28 +108,42 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       return;
     }
     tree.replaceChildren(...currentNodes.map((node) => renderNode(node, 0)));
+    focusPendingWebFolderInput();
   };
 
   scope.add(nodes.subscribe(renderTree));
   scope.add(emptyText.subscribe(renderTree));
 
   scope.add(
-    delegate(root, "click", "[data-xplorer-toggle]", (_event, target) => {
-      const id = target.getAttribute("data-xplorer-toggle");
-      if (!id) return;
-      if (expanded.has(id)) expanded.delete(id);
-      else expanded.add(id);
-      void persistExpanded();
-      renderTree();
-    }),
-  );
-
-  scope.add(
     delegate(root, "click", "[data-xplorer-row]", (_event, target) => {
       const id = target.getAttribute("data-xplorer-row");
       if (!id) return;
       const node = findNode(nodes.get(), id);
-      if (!node || node.kind !== "file") return;
+      if (!node) return;
+      const webRoot = findWebRootForNode(nodes.get(), id);
+      if (webRoot) {
+        if (node.kind === "folder") {
+          if (expanded.has(node.id)) {
+            expanded.delete(node.id);
+            void persistExpanded();
+            renderTree();
+            return;
+          }
+          expanded.add(node.id);
+          void persistExpanded();
+          renderTree();
+        }
+        options.onOpenWebFolder?.(webRoot);
+        return;
+      }
+      if (node.kind === "folder") {
+        if (expanded.has(node.id)) expanded.delete(node.id);
+        else expanded.add(node.id);
+        void persistExpanded();
+        renderTree();
+        return;
+      }
+      if (node.kind !== "file") return;
       options.onOpenFile?.(node);
     }),
   );
@@ -128,8 +158,13 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
 
       if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
         keyboardEvent.preventDefault();
-        if (expanded.has(id)) expanded.delete(id);
-        else expanded.add(id);
+        const webRoot = findWebRootForNode(nodes.get(), id);
+        if (expanded.has(id)) {
+          expanded.delete(id);
+        } else {
+          expanded.add(id);
+          if (webRoot) options.onOpenWebFolder?.(webRoot);
+        }
         void persistExpanded();
         renderTree();
       }
@@ -374,6 +409,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     return [
       { id: "xplorer.newFile", label: "New file" },
       { id: "xplorer.newFolder", label: "New folder" },
+      { id: "xplorer.newWebFolder", label: "New web folder" },
       { type: "separator", id: "xplorer.separator.create" },
       { id: "xplorer.copy", label: "Copy" },
       { id: "xplorer.cut", label: "Cut" },
@@ -396,6 +432,9 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
         return;
       case "xplorer.newFolder":
         await createChild(node, "folder");
+        return;
+      case "xplorer.newWebFolder":
+        startWebFolderCreate(node);
         return;
       case "xplorer.copy":
         await copyItem(node, "copy");
@@ -435,6 +474,48 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     } catch (error) {
       showError(error);
     }
+  }
+
+  function startWebFolderCreate(node: XplorerNode) {
+    if (node.kind !== "folder") return;
+    pendingWebFolder = {
+      parentId: node.id,
+      value: "New web folder",
+    };
+    expanded.add(node.id);
+    renderTree();
+  }
+
+  async function commitPendingWebFolder() {
+    if (!pendingWebFolder) return;
+    const pending = pendingWebFolder;
+    const name = pending.value.trim();
+    if (!name) {
+      pendingWebFolder = undefined;
+      renderTree();
+      return;
+    }
+    try {
+      const folderPath = await window.spaces.createWebFolder(
+        pending.parentId,
+        name,
+      );
+      pendingWebFolder = undefined;
+      expanded.add(pending.parentId);
+      expanded.add(folderPath);
+      await persistExpanded();
+      await loadSpaceItems();
+    } catch (error) {
+      pendingWebFolder = pending;
+      renderTree();
+      showError(error);
+    }
+  }
+
+  function cancelPendingWebFolder() {
+    if (!pendingWebFolder) return;
+    pendingWebFolder = undefined;
+    renderTree();
   }
 
   async function copyItem(node: XplorerNode, mode: "copy" | "cut") {
@@ -487,7 +568,10 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     const item = el("div", "nb-xplorer__item");
     item.setAttribute("role", "none");
 
-    const row = el("button", `nb-xplorer__row nb-xplorer__row--${node.kind}`);
+    const row = el(
+      "button",
+      `nb-xplorer__row nb-xplorer__row--${node.kind}${node.web ? " nb-xplorer__row--web" : ""}`,
+    );
     if (depth > 0) row.classList.add("nb-xplorer__row--nested");
     row.type = "button";
     row.draggable = true;
@@ -508,6 +592,11 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       render(disclosure, chevronRightIcon);
       row.append(disclosure);
     }
+    if (node.web) {
+      const icon = el("span", "nb-xplorer__web-icon");
+      icon.innerHTML = worldIcon;
+      row.append(icon);
+    }
     row.append(el("span", "nb-xplorer__label", node.name));
     item.append(row);
 
@@ -518,10 +607,72 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       for (const child of node.children ?? []) {
         group.append(renderNode(child, depth + 1));
       }
+      if (pendingWebFolder?.parentId === node.id) {
+        group.append(renderPendingWebFolder(depth + 1));
+      }
       item.append(group);
     }
 
     return item;
+  }
+
+  function renderPendingWebFolder(depth: number): HTMLElement {
+    const item = el("div", "nb-xplorer__item");
+    item.setAttribute("role", "none");
+
+    const row = el(
+      "div",
+      "nb-xplorer__row nb-xplorer__row--folder nb-xplorer__row--web nb-xplorer__row--pending-web",
+    );
+    row.style.setProperty("--nb-xplorer-depth", String(depth));
+    row.setAttribute("role", "treeitem");
+
+    const disclosure = el("span", "nb-xplorer__disclosure");
+    render(disclosure, chevronRightIcon);
+
+    const icon = el("span", "nb-xplorer__web-icon");
+    icon.innerHTML = worldIcon;
+
+    const input = el(
+      "input",
+      "nb-xplorer__pending-input",
+    ) as HTMLInputElement;
+    input.type = "text";
+    input.value = pendingWebFolder?.value ?? "";
+    input.setAttribute("aria-label", "New web folder name");
+    input.addEventListener("input", () => {
+      if (pendingWebFolder) pendingWebFolder.value = input.value;
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void commitPendingWebFolder();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        cancelPendingWebFolder();
+      }
+    });
+    input.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (document.activeElement !== input) cancelPendingWebFolder();
+      }, 0);
+    });
+
+    row.append(disclosure, icon, input);
+    item.append(row);
+    return item;
+  }
+
+  function focusPendingWebFolderInput() {
+    if (!pendingWebFolder) return;
+    requestAnimationFrame(() => {
+      const input = tree.querySelector<HTMLInputElement>(
+        ".nb-xplorer__pending-input",
+      );
+      if (!input) return;
+      input.focus();
+      input.select();
+    });
   }
 
   function bindResizeHandle(handle: HTMLElement) {
@@ -573,6 +724,7 @@ const baseContextMenuActionIds = new Set([
   "xplorer.open",
   "xplorer.newFile",
   "xplorer.newFolder",
+  "xplorer.newWebFolder",
   "xplorer.copy",
   "xplorer.cut",
   "xplorer.copyPath",
@@ -611,6 +763,20 @@ function findNode(nodes: XplorerNode[], id: string): XplorerNode | undefined {
   for (const node of nodes) {
     if (node.id === id) return node;
     const child = findNode(node.children ?? [], id);
+    if (child) return child;
+  }
+  return undefined;
+}
+
+function findWebRootForNode(
+  nodes: XplorerNode[],
+  id: string,
+  currentWebRoot?: XplorerNode,
+): XplorerNode | undefined {
+  for (const node of nodes) {
+    const nextWebRoot = node.web ? node : currentWebRoot;
+    if (node.id === id) return nextWebRoot;
+    const child = findWebRootForNode(node.children ?? [], id, nextWebRoot);
     if (child) return child;
   }
   return undefined;

@@ -30,6 +30,7 @@ import { createSidebar } from "./sidebar";
 import { createToolbar } from "./toolbar";
 import { statusBar } from "./statusbar";
 import { createXplorer } from "./xplorer";
+import { createWebProjectPreview } from "./web-project-preview";
 
 /// Options used to assemble the default workbench shell.
 export interface WorkbenchOptions {
@@ -116,6 +117,9 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           },
           onOpenFile(node) {
             void openSpaceFile(node.id, node.name);
+          },
+          onOpenWebFolder(node) {
+            openWebProjectFolder(node.id, node.name);
           },
         },
         scope,
@@ -259,7 +263,9 @@ export function workbench(options: WorkbenchOptions = {}): Component {
             tabId: videoTabId(filePath),
             createView: createVideoViewer,
           });
+          return;
         }
+
       }
 
       async function openMarkdownFile(filePath: string, title: string) {
@@ -374,6 +380,58 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           }),
         );
       }
+
+      function openWebProjectFolder(folderPath: string, title: string) {
+        const currentLayout = layout.get();
+        const stackId = findActiveStackId(currentLayout);
+        if (!stackId) return;
+
+        const tabId = webProjectTabId(folderPath);
+        const existing = currentLayout.tabs[tabId];
+        if (existing) {
+          const existingStackId =
+            findStackContainingTab(currentLayout, tabId) ?? stackId;
+          layout.set(
+            applyLayoutTransaction(currentLayout, {
+              type: "activateTab",
+              stackId: existingStackId,
+              tabId,
+            }),
+          );
+          return;
+        }
+
+        const pageId = `page:${tabId}`;
+        const contentId = `content:${tabId}`;
+
+        layout.set(
+          applyLayoutTransaction(layout.get(), {
+            type: "openTab",
+            stackId,
+            tab: {
+              id: tabId,
+              title,
+              resource: `file://${folderPath}`,
+              page: pageId,
+              closable: true,
+            },
+            page: {
+              kind: "content",
+              id: pageId,
+              contentId,
+            },
+            content: {
+              id: contentId,
+              kind: "web",
+              resource: `file://${folderPath}`,
+              view: createWebProjectPreview({
+                rootPath: folderPath,
+              }),
+            },
+            activate: true,
+          }),
+        );
+      }
     },
   };
 }
@@ -480,6 +538,10 @@ function imageTabId(filePath: string) {
 
 function videoTabId(filePath: string) {
   return `video:${encodeURIComponent(filePath)}`;
+}
+
+function webProjectTabId(filePath: string) {
+  return `web-project:${encodeURIComponent(filePath)}`;
 }
 
 function isMarkdownFile(fileName: string) {
