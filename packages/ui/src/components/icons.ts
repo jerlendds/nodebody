@@ -102,6 +102,7 @@ import userShieldSvg from "../icons/user-shield.svg?raw";
 import videoSvg from "../icons/video.svg?raw";
 import windowMaximizeSvg from "../icons/window-maximize.svg?raw";
 import workflowSvg from "../icons/workflow.svg?raw";
+import variableSvg from "../icons/variables.svg?raw";
 import cmdSvg from "../icons/command.svg?raw";
 import xSvg from "../icons/x.svg?raw";
 
@@ -227,6 +228,7 @@ export const userShieldIcon = icon(userShieldSvg);
 export const videoIcon = icon(videoSvg);
 export const windowMaximizeIcon = icon(windowMaximizeSvg);
 export const workflowIcon = icon(workflowSvg);
+export const variableIcon = icon(variableSvg);
 export const xIcon = icon(xSvg);
 export const wordmarkIcon = icon(wordmarkSvg);
 export const stopwatchIcon = icon(stopwatchSvg);
