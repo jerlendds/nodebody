@@ -19,11 +19,16 @@ import {
   disposable,
   getContextMenuManager,
   getHotkeyManager,
-  graphFolderIcon,
+  folderIcon,
+  folderOpenIcon,
   applyComponentTheme,
   el,
+  render,
 } from "@nodebody/ui";
-import { createMarkdownEditor, gfmMarkdownOptions } from "@nodebody/editor-markdown";
+import {
+  createMarkdownEditor,
+  gfmMarkdownOptions,
+} from "@nodebody/editor-markdown";
 import { shouldShowWelcomeOnStartup, welcomeView } from "../pages/welcome";
 import type { ActivityItem, SidebarSide } from "./sidebar";
 import { createSidebar } from "./sidebar";
@@ -47,9 +52,9 @@ export interface WorkbenchOptions {
 const defaultActivities = [
   {
     id: "xplorer",
-    label: "File Xplorer",
-    icon: graphFolderIcon,
-    tooltip: "File Xplorer",
+    label: "Xplorer",
+    icon: folderIcon,
+    tooltip: "Space Xplorer",
   },
 ];
 
@@ -272,7 +277,6 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           });
           return;
         }
-
       }
 
       async function openMarkdownFile(filePath: string, title: string) {
@@ -787,6 +791,10 @@ function updateActivityButtons(
       "is-active",
       activity === "xplorer" ? isXplorerOpen : activity === activeActivity,
     );
+    if (activity === "xplorer") {
+      const icon = item.querySelector("[data-activity-icon='xplorer']");
+      if (icon) render(icon, isXplorerOpen ? folderOpenIcon : folderIcon);
+    }
   }
 }
 

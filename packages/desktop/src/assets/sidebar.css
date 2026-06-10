@@ -33,11 +33,6 @@
   margin-top: auto;
 }
 
-/* fixes visual alignment of first graph folder icon */
-.nb-sidebar__items:first-child {
-  padding-right: 3px;
-}
-
 .nb-icon-button {
   position: relative;
   display: grid;

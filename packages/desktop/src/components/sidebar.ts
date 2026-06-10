@@ -59,8 +59,11 @@ function createActivityButton(item: ActivityItem, scope: Scope) {
   button.type = "button";
   button.dataset.activity = item.id;
   button.setAttribute("aria-label", item.label);
-  if (typeof item.icon === "string") render(button, item.icon);
-  else button.append(item.icon);
+  const icon = el("span", "nb-icon-button__icon");
+  icon.dataset.activityIcon = item.id;
+  if (typeof item.icon === "string") render(icon, item.icon);
+  else icon.append(item.icon);
+  button.append(icon);
   if (item.badge) button.append(el("span", "nb-badge", item.badge));
   if (item.tooltip) {
     attachTooltip(button, { text: item.tooltip }, scope, {
