@@ -110,8 +110,18 @@ export function registerSpacesIpc() {
   );
 
   ipcMain.handle("spaces:deleteItem", async (_event, itemPath: string) => {
-    const resolved = assertActiveSpaceItemPath(itemPath);
-    return trashItem(resolved);
+    try {
+      const resolved = assertActiveSpaceItemPath(itemPath);
+      const target = await trashItem(resolved);
+      return target;
+    } catch (error) {
+      console.error("[spaces:deleteItem] failed", {
+        itemPath,
+        activeSpacePath,
+        error,
+      });
+      throw error;
+    }
   });
 
   ipcMain.handle(
@@ -186,8 +196,47 @@ async function trashItem(itemPath: string) {
 
   await fs.mkdir(trashPath, { recursive: true });
   const target = await availableTrashPath(trashPath, path.basename(itemPath));
-  await fs.rename(itemPath, target);
+  await moveToTrash(itemPath, target);
+  const sourceAfter = await statSummary(itemPath);
+
+  if (sourceAfter.exists) {
+    throw new Error(`Could not move item to Trash: ${itemPath}`);
+  }
   return target;
+}
+
+async function moveToTrash(itemPath: string, target: string) {
+  try {
+    await fs.rename(itemPath, target);
+  } catch (error) {
+    console.error("[spaces:moveToTrash] rename failed", {
+      itemPath,
+      target,
+      error,
+    });
+    if (!isErrorCode(error, "EXDEV")) throw error;
+    console.warn("[spaces:moveToTrash] falling back after EXDEV", {
+      itemPath,
+      target,
+    });
+    await copyThenRemove(itemPath, target);
+    return;
+  }
+
+  if (await isPathAvailable(itemPath)) return;
+  console.warn("[spaces:moveToTrash] source still exists after rename", {
+    itemPath,
+    target,
+  });
+  await copyThenRemove(itemPath, target);
+}
+
+async function copyThenRemove(itemPath: string, target: string) {
+  if (!(await isPathAvailable(target))) {
+    throw new Error(`Trash target already exists: ${target}`);
+  }
+  await fs.cp(itemPath, target, { recursive: true, errorOnExist: true });
+  await fs.rm(itemPath, { recursive: true, force: false });
 }
 
 async function availableTrashPath(trashPath: string, name: string) {
@@ -227,6 +276,27 @@ async function isPathAvailable(itemPath: string) {
   return false;
 }
 
+async function statSummary(itemPath: string) {
+  try {
+    const stat = await fs.stat(itemPath);
+    return {
+      exists: true,
+      isDirectory: stat.isDirectory(),
+      isFile: stat.isFile(),
+      size: stat.size,
+      mtimeMs: stat.mtimeMs,
+    };
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return { exists: false };
+    }
+    return {
+      exists: "unknown",
+      error,
+    };
+  }
+}
+
 function childPath(parentPath: string, name: string) {
   const cleanName = name.trim();
   if (!cleanName) throw new Error("Name is required.");
@@ -237,10 +307,14 @@ function childPath(parentPath: string, name: string) {
 }
 
 function isNotFoundError(error: unknown) {
+  return isErrorCode(error, "ENOENT");
+}
+
+function isErrorCode(error: unknown, code: string) {
   if (typeof error !== "object" || error === null || !("code" in error)) {
     return false;
   }
-  return (error as { code?: unknown }).code === "ENOENT";
+  return (error as { code?: unknown }).code === code;
 }
 
 function mimeTypeForPath(itemPath: string) {

@@ -46,7 +46,7 @@ interface SpacesApi {
   createFile: (parentPath: string, name: string) => Promise<string>;
   createFolder: (parentPath: string, name: string) => Promise<string>;
   renameItem: (itemPath: string, name: string) => Promise<string>;
-  deleteItem: (itemPath: string) => Promise<void>;
+  deleteItem: (itemPath: string) => Promise<string>;
   writeItem: (itemPath: string, value: string) => Promise<void>;
   create: (directoryPath: string) => Promise<Space>;
   select: (directoryPath: string) => Promise<Space>;

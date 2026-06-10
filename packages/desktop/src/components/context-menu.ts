@@ -21,6 +21,7 @@ export function createDesktopContextMenuBridge(): ContextMenuBridge {
             armDismissTimer = undefined;
           }
           if (activeDismiss === onDismiss) activeDismiss = undefined;
+          menu.removeEventListener("pointerdown", onMenuPointerDown);
           document.removeEventListener("pointerdown", onPointerDown, true);
           document.removeEventListener("keydown", onKeyDown, true);
           window.removeEventListener("resize", onDismiss, true);
@@ -34,8 +35,12 @@ export function createDesktopContextMenuBridge(): ContextMenuBridge {
           resolve(id ? { id } : null);
         };
         const onDismiss = () => finish(null);
+        const onMenuPointerDown = (event: PointerEvent) => {
+          event.stopPropagation();
+        };
         const onPointerDown = (event: PointerEvent) => {
-          if (!menu.contains(event.target as Node)) finish(null);
+          const inside = menu.contains(event.target as Node);
+          if (!inside) finish(null);
         };
         const onKeyDown = (event: KeyboardEvent) => {
           if (event.key === "Escape") {
@@ -76,6 +81,7 @@ export function createDesktopContextMenuBridge(): ContextMenuBridge {
         document.body.append(menu);
         positionMenu(menu, payload.x, payload.y);
         menu.style.visibility = "";
+        menu.addEventListener("pointerdown", onMenuPointerDown);
         activeDismiss = onDismiss;
 
         armDismissTimer = window.setTimeout(() => {
@@ -125,9 +131,28 @@ function createMenuItem(
     item.append(accelerator);
   }
 
-  item.addEventListener("click", () => {
-    if (!item.disabled) select(action.id);
+  let selected = false;
+  const choose = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (selected || item.disabled) return;
+    selected = true;
+    select(action.id);
+  };
+
+  item.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) {
+      event.stopPropagation();
+      return;
+    }
+    choose(event);
   });
+
+  item.addEventListener("pointerup", (event) => {
+    if (event.button !== 0) return;
+    choose(event);
+  });
+  item.addEventListener("click", choose);
 
   return item;
 }

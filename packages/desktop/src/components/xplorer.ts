@@ -289,31 +289,23 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
 
   function registerContextMenu() {
     const manager = getContextMenuManager();
+    let activeContext: XplorerContext | undefined;
     scope.add(
       manager.register(root, {
         shouldShow(event) {
-          return Boolean(xplorerRowForEvent(event));
+          return Boolean(contextForEvent(event));
         },
 
         getActions(event) {
           const context = contextForEvent(event);
+          activeContext = context;
           if (!context) return [];
-
-          const baseActions = baseContextMenuActions(context.node);
-          const contributedActions = contextMenuContributors()
-            .flatMap((contribution) => [...contribution.getActions(context)])
-            .filter((action) => action.visible !== false);
-
-          if (!contributedActions.length) return baseActions;
-          return [
-            ...baseActions,
-            { id: "xplorer.plugin.separator", type: "separator" },
-            ...contributedActions,
-          ];
+          return contextMenuActions(context);
         },
 
         async runAction(actionId, event) {
-          const context = contextForEvent(event);
+          const context = activeContext ?? contextForEvent(event);
+          activeContext = undefined;
           if (!context) return;
 
           if (isBaseContextMenuAction(actionId)) {
@@ -332,6 +324,20 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     );
   }
 
+  function contextMenuActions(context: XplorerContext): ContextMenuAction[] {
+    const baseActions = baseContextMenuActions(context.node);
+    const contributedActions = contextMenuContributors()
+      .flatMap((contribution) => [...contribution.getActions(context)])
+      .filter((action) => action.visible !== false);
+
+    if (!contributedActions.length) return baseActions;
+    return [
+      ...baseActions,
+      { id: "xplorer.plugin.separator", type: "separator" as const },
+      ...contributedActions,
+    ];
+  }
+
   function contextMenuContributors() {
     return [
       ...(options.contextMenuContributors ?? []),
@@ -340,15 +346,11 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   }
 
   function contextForEvent(event: ContextMenuEvent): XplorerContext | undefined {
-    const row = xplorerRowForEvent(event);
+    const row = event.target.closest<HTMLElement>("[data-xplorer-row]");
     const id = row?.dataset.xplorerRow;
     if (!id) return undefined;
     const node = findNode(nodes.get(), id);
     return node ? { node, event } : undefined;
-  }
-
-  function xplorerRowForEvent(event: ContextMenuEvent) {
-    return event.target.closest<HTMLElement>("[data-xplorer-row]");
   }
 
   function baseContextMenuActions(node: XplorerNode): ContextMenuAction[] {
@@ -454,18 +456,24 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   }
 
   async function deleteItem(node: XplorerNode) {
+    // TODO: Implement modal for this confirm message, add checkbox to show again that can be toggled off, in settings can toggle it back on...
     const message =
       node.kind === "folder"
         ? `Move ${node.name} and its contents to Trash?`
         : `Move ${node.name} to Trash?`;
-    if (!window.confirm(message)) return;
 
     try {
-      await window.spaces.deleteItem(node.id);
+      removeNodeFromTree(node);
       await loadSpaceItems();
     } catch (error) {
       showError(error);
     }
+  }
+
+  function removeNodeFromTree(node: XplorerNode) {
+    const [nextNodes] = removeNode(nodes.get(), node.id);
+    for (const id of nodeAndDescendantIds(node)) expanded.delete(id);
+    nodes.set(nextNodes);
   }
 
   function renderNode(node: XplorerNode, depth: number): HTMLElement {
@@ -620,6 +628,13 @@ function containsNode(node: XplorerNode, id: string): boolean {
       (child) => child.id === id || containsNode(child, id),
     ) ?? false
   );
+}
+
+function nodeAndDescendantIds(node: XplorerNode): string[] {
+  return [
+    node.id,
+    ...(node.children?.flatMap((child) => nodeAndDescendantIds(child)) ?? []),
+  ];
 }
 
 function moveNode(

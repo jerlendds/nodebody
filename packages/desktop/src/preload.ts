@@ -46,8 +46,9 @@ contextBridge.exposeInMainWorld("spaces", {
       return nextPath;
     }),
   deleteItem: (itemPath: string) =>
-    ipcRenderer.invoke("spaces:deleteItem", itemPath).then(() => {
+    ipcRenderer.invoke("spaces:deleteItem", itemPath).then((trashPath) => {
       window.dispatchEvent(new CustomEvent("spaces:changed"));
+      return trashPath;
     }),
   writeItem: (itemPath: string, value: string) =>
     ipcRenderer.invoke("spaces:writeItem", itemPath, value),
