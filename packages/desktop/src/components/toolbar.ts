@@ -14,7 +14,7 @@ import {
   arrowNarrowRightIcon,
   cmdIcon,
   logoIcon,
-  mindMapIcon,
+  bulbIcon,
   minusIcon,
   windowMaximizeIcon,
   xIcon,
@@ -123,10 +123,10 @@ export function createToolbar(scope: Scope) {
   render(
     brand,
     html`<span class="nb-toolbar__brand-icon nb-toolbar__brand-icon--graph">
-        ${mindMapIcon}
+        ${logoIcon}
       </span>
       <span class="nb-toolbar__brand-icon nb-toolbar__brand-icon--logo">
-        ${logoIcon}
+        ${bulbIcon}
       </span>`,
   );
   attachTooltip(

@@ -59,6 +59,8 @@ interface SpacesApi {
   items: () => Promise<SpaceItem[]>;
   setXplorerExpandedIds: (ids: string[]) => Promise<void>;
   setXplorerOpen: (open: boolean) => Promise<void>;
+  readDesignTokens: () => Promise<string | undefined>;
+  writeDesignTokens: (value: string) => Promise<void>;
   readItem: (itemPath: string) => Promise<string>;
   readItemDataUrl: (itemPath: string) => Promise<string>;
   relativeItemPath: (itemPath: string) => Promise<string>;

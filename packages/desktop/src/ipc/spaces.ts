@@ -24,6 +24,7 @@ export interface SpaceItem {
 }
 
 let activeSpacePath: string | undefined;
+const designTokenFileName = "design.token";
 
 export function registerSpacesIpc() {
   ipcMain.handle("spaces:list", async () => {
@@ -72,6 +73,33 @@ export function registerSpacesIpc() {
     if (!spacePath) return;
     await updateSpaceXplorerOpen(spacePath, Boolean(open));
   });
+
+  ipcMain.handle("spaces:readDesignTokens", async () => {
+    const spacePath = await getActiveSpacePath();
+    if (!spacePath) return undefined;
+    try {
+      return await fs.readFile(designTokenPath(spacePath), "utf8");
+    } catch (error) {
+      if (isNotFoundError(error)) return undefined;
+      throw error;
+    }
+  });
+
+  ipcMain.handle(
+    "spaces:writeDesignTokens",
+    async (_event, value: string) => {
+      const spacePath = await getActiveSpacePath();
+      if (!spacePath) throw new Error("Please select a space");
+      JSON.parse(value);
+      const nbDir = path.join(spacePath, ".nb");
+      await fs.mkdir(nbDir, { recursive: true });
+      await fs.writeFile(
+        designTokenPath(spacePath),
+        `${value.trim()}\n`,
+        "utf8",
+      );
+    },
+  );
 
   ipcMain.handle("spaces:readItem", async (_event, itemPath: string) => {
     await getActiveSpacePath();
@@ -224,6 +252,10 @@ function withDisplayPath(space: Space): DisplaySpace {
     ...space,
     displayPath: formatHomePathForDisplay(space.path),
   };
+}
+
+function designTokenPath(spacePath: string) {
+  return path.join(spacePath, ".nb", designTokenFileName);
 }
 
 async function listSpaceItems(spacePath: string): Promise<SpaceItem[]> {

@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld("spaces", {
     ipcRenderer.invoke("spaces:setXplorerExpandedIds", ids),
   setXplorerOpen: (open: boolean) =>
     ipcRenderer.invoke("spaces:setXplorerOpen", open),
+  readDesignTokens: () => ipcRenderer.invoke("spaces:readDesignTokens"),
+  writeDesignTokens: (value: string) =>
+    ipcRenderer.invoke("spaces:writeDesignTokens", value),
   readItem: (itemPath: string) =>
     ipcRenderer.invoke("spaces:readItem", itemPath),
   readItemDataUrl: (itemPath: string) =>

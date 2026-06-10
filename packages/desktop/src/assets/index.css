@@ -10,6 +10,7 @@
 @import "web-project-preview.css";
 @import "web-file-editor.css";
 @import "welcome.css";
+@import "variables.css";
 
 :root {
   --nb-toolbar-height: 32px;
@@ -87,6 +88,10 @@
 }
 
 .nb-workbench.is-xplorer-open {
+  --nb-xplorer-column-width: var(--nb-xplorer-width);
+}
+
+.nb-workbench.is-design-system-panel-open {
   --nb-xplorer-column-width: var(--nb-xplorer-width);
 }
 
