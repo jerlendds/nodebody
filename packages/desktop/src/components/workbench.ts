@@ -435,6 +435,13 @@ export function workbench(options: WorkbenchOptions = {}): Component {
               resource: `file://${folderPath}`,
               view: createWebProjectPreview({
                 rootPath: folderPath,
+                onOpenSource(source) {
+                  void openWebProjectFile(
+                    pathFromVirtual(folderPath, source.file),
+                    source.file.split("/").pop() || source.file,
+                    { line: source.line, column: source.column },
+                  );
+                },
               }),
             },
             activate: true,
@@ -442,7 +449,11 @@ export function workbench(options: WorkbenchOptions = {}): Component {
         );
       }
 
-      async function openWebProjectFile(filePath: string, title: string) {
+      async function openWebProjectFile(
+        filePath: string,
+        title: string,
+        reveal?: { line: number; column: number },
+      ) {
         const currentLayout = layout.get();
         const stackId = findActiveStackId(currentLayout);
         if (!stackId) return;
@@ -459,6 +470,7 @@ export function workbench(options: WorkbenchOptions = {}): Component {
               tabId,
             }),
           );
+          if (reveal) dispatchWebFileReveal(filePath, reveal);
           return;
         }
 
@@ -490,6 +502,7 @@ export function workbench(options: WorkbenchOptions = {}): Component {
                 filePath,
                 title,
                 initialText,
+                reveal,
                 setSaving(saving) {
                   setTabSavingState(tabId, saving);
                 },
@@ -501,6 +514,23 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       }
     },
   };
+}
+
+function pathFromVirtual(rootPath: string, virtualPath: string) {
+  const root = rootPath.replace(/\\/g, "/").replace(/\/$/, "");
+  const relative = virtualPath.replace(/\\/g, "/").replace(/^\/+/, "");
+  return `${root}/${relative}`;
+}
+
+function dispatchWebFileReveal(
+  filePath: string,
+  reveal: { line: number; column: number },
+) {
+  window.dispatchEvent(
+    new CustomEvent("nb:web-file-reveal", {
+      detail: { filePath, ...reveal },
+    }),
+  );
 }
 
 function closeWindow() {

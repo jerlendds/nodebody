@@ -11,6 +11,10 @@ interface WebFileEditorOptions {
   filePath: string;
   title: string;
   initialText: string;
+  reveal?: {
+    line: number;
+    column: number;
+  };
   setSaving: (saving: boolean) => void;
 }
 
@@ -48,6 +52,7 @@ export function createWebFileEditor(options: WebFileEditorOptions): Component {
         theme: "vs-dark",
       });
       scope.add(disposable(() => editor.dispose()));
+      revealLocation(editor, options.reveal);
 
       const flush = () => {
         if (saving) return;
@@ -63,6 +68,11 @@ export function createWebFileEditor(options: WebFileEditorOptions): Component {
           .writeItem(options.filePath, value)
           .then(() => {
             lastSavedText = value;
+            window.dispatchEvent(
+              new CustomEvent("nb:web-file-saved", {
+                detail: { filePath: options.filePath },
+              }),
+            );
           })
           .finally(() => {
             saving = false;
@@ -88,6 +98,25 @@ export function createWebFileEditor(options: WebFileEditorOptions): Component {
           if (saveTimer !== undefined) window.clearTimeout(saveTimer);
           flush();
         }),
+      );
+
+      const onReveal = (event: Event) => {
+        const detail = (
+          event as CustomEvent<{
+            filePath?: string;
+            line?: number;
+            column?: number;
+          }>
+        ).detail;
+        if (detail?.filePath !== options.filePath) return;
+        revealLocation(editor, {
+          line: detail.line ?? 1,
+          column: detail.column ?? 1,
+        });
+      };
+      window.addEventListener("nb:web-file-reveal", onReveal);
+      scope.add(
+        disposable(() => window.removeEventListener("nb:web-file-reveal", onReveal)),
       );
     },
   };
@@ -143,4 +172,18 @@ function languageForPath(fileName: string) {
 function fileExtension(fileName: string) {
   const index = fileName.lastIndexOf(".");
   return index >= 0 ? fileName.slice(index).toLowerCase() : "";
+}
+
+function revealLocation(
+  editor: monaco.editor.IStandaloneCodeEditor,
+  location: WebFileEditorOptions["reveal"],
+) {
+  if (!location) return;
+  const position = {
+    lineNumber: Math.max(1, location.line),
+    column: Math.max(1, location.column),
+  };
+  editor.setPosition(position);
+  editor.revealPositionInCenter(position);
+  editor.focus();
 }
