@@ -1,8 +1,4 @@
-import type {
-  ContextMenuAction,
-  ContextMenuEvent,
-  Scope,
-} from "@nodebody/ui";
+import type { ContextMenuAction, ContextMenuEvent, Scope } from "@nodebody/ui";
 import {
   chevronRightIcon,
   delegate,
@@ -82,7 +78,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   root.setAttribute("aria-hidden", "true");
 
   const header = el("div", "nb-xplorer__header");
-  header.append(el("span", "nb-xplorer__title", "File Xplorer"));
+  header.append(el("span", "nb-xplorer__title", "Space Xplorer"));
 
   const tree = el("div", "nb-xplorer__tree");
   tree.setAttribute("role", "tree");
@@ -272,7 +268,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   const resizeHandle = el("div", "nb-xplorer__resize");
   resizeHandle.setAttribute("role", "separator");
   resizeHandle.setAttribute("aria-orientation", "vertical");
-  resizeHandle.title = "Resize File Xplorer";
+  resizeHandle.title = "Resize Space Xplorer";
   bindResizeHandle(resizeHandle);
 
   root.append(header, tree, resizeHandle);
@@ -351,7 +347,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
         async runAction(actionId, event) {
           const context = activeContext ?? contextForEvent(event);
           activeContext = undefined;
- 
+
           if (!context) return;
 
           if (isBaseContextMenuAction(actionId)) {
@@ -391,7 +387,9 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     ];
   }
 
-  function contextForEvent(event: ContextMenuEvent): XplorerContext | undefined {
+  function contextForEvent(
+    event: ContextMenuEvent,
+  ): XplorerContext | undefined {
     const row = event.target.closest<HTMLElement>("[data-xplorer-row]");
     const id = row?.dataset.xplorerRow;
     if (!id) return undefined;
@@ -642,10 +640,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     const icon = el("span", "nb-xplorer__web-icon");
     icon.innerHTML = worldIcon;
 
-    const input = el(
-      "input",
-      "nb-xplorer__pending-input",
-    ) as HTMLInputElement;
+    const input = el("input", "nb-xplorer__pending-input") as HTMLInputElement;
     input.type = "text";
     input.value = pendingWebFolder?.value ?? "";
     input.setAttribute("aria-label", "New web folder name");
