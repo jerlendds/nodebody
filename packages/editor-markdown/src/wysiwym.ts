@@ -385,7 +385,7 @@ function completeTableStartLine(
     first -= 1;
   }
 
-  if (first + 1 > doc.lines) return false;
+  if (first + 1 > doc.lines) return undefined;
 
   const header = parseTableRow(doc.line(first).text);
   const separator = parseTableRow(doc.line(first + 1).text);
