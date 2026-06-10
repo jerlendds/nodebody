@@ -1,4 +1,4 @@
-import type { ContextMenuAction, ContextMenuBridge } from "@nodebody/ui";
+import type { ContextMenuAction, ContextMenuBridge } from "@interfacez/ui";
 
 export function createDesktopContextMenuBridge(): ContextMenuBridge {
   let activeDismiss: (() => void) | undefined;

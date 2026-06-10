@@ -6,30 +6,30 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^@nodebody\/editor-markdown$/,
+        find: /^@interfacez\/editor-markdown$/,
         replacement: resolve(__dirname, "../editor-markdown/src/index.ts"),
       },
       {
-        find: /^@nodebody\/editor-markdown\/markdown-editor\.css$/,
+        find: /^@interfacez\/editor-markdown\/markdown-editor\.css$/,
         replacement: resolve(
           __dirname,
           "../editor-markdown/src/markdown-editor.css",
         ),
       },
       {
-        find: /^@nodebody\/editor-markdown\/(.*)$/,
+        find: /^@interfacez\/editor-markdown\/(.*)$/,
         replacement: resolve(__dirname, "../editor-markdown/src/$1"),
       },
       {
-        find: /^@nodebody\/ui$/,
+        find: /^@interfacez\/ui$/,
         replacement: resolve(__dirname, "../ui/src/index.ts"),
       },
       {
-        find: /^@nodebody\/ui\/index\.css$/,
+        find: /^@interfacez\/ui\/index\.css$/,
         replacement: resolve(__dirname, "../ui/src/index.css"),
       },
       {
-        find: /^@nodebody\/ui\/(.*)$/,
+        find: /^@interfacez\/ui\/(.*)$/,
         replacement: resolve(__dirname, "../ui/src/$1"),
       },
     ],

@@ -1,12 +1,7 @@
 import * as esbuild from "esbuild-wasm";
 import wasmUrl from "esbuild-wasm/esbuild.wasm?url";
 
-type ProjectLanguage =
-  | "typescript"
-  | "javascript"
-  | "html"
-  | "css"
-  | "json";
+type ProjectLanguage = "typescript" | "javascript" | "html" | "css" | "json";
 
 type CdnProvider = "esm.sh" | "jsdelivr-esm" | "unpkg" | "jspm";
 
@@ -145,7 +140,7 @@ async function bundleEntry(project: ProjectState, entryPath: string) {
     logLevel: "silent",
     metafile: false,
     platform: "browser",
-    outdir: "/nodebody-preview",
+    outdir: "/interfacez-preview",
     sourcemap: "inline",
     target: ["es2020"],
     write: false,
@@ -174,11 +169,13 @@ async function bundleEntry(project: ProjectState, entryPath: string) {
 
 function virtualProjectPlugin(project: ProjectState): esbuild.Plugin {
   return {
-    name: "nodebody-virtual-project",
+    name: "interfacez-virtual-project",
     setup(build) {
       build.onResolve({ filter: /.*/ }, (args) => {
-        if (isRemoteSpecifier(args.path)) return { path: args.path, external: true };
-        if (isPackageSpecifier(args.path)) return { path: args.path, external: true };
+        if (isRemoteSpecifier(args.path))
+          return { path: args.path, external: true };
+        if (isPackageSpecifier(args.path))
+          return { path: args.path, external: true };
 
         const resolved =
           args.kind === "entry-point"
@@ -203,12 +200,12 @@ function virtualProjectPlugin(project: ProjectState): esbuild.Plugin {
 
         return {
           path: resolved,
-          namespace: "nodebody-preview",
+          namespace: "interfacez-preview",
         };
       });
 
       build.onLoad(
-        { filter: /.*/, namespace: "nodebody-preview" },
+        { filter: /.*/, namespace: "interfacez-preview" },
         (args) => {
           const file = project.files[normalizeVirtualPath(args.path)];
           if (!file) {
@@ -246,7 +243,8 @@ function parseHtmlEntry(project: ProjectState, file: ProjectFile) {
 }
 
 function inlineStylesFromHead(head: string) {
-  if (typeof DOMParser === "undefined") return inlineStylesFromHeadFallback(head);
+  if (typeof DOMParser === "undefined")
+    return inlineStylesFromHeadFallback(head);
 
   const doc = new DOMParser().parseFromString(
     `<!doctype html><html><head>${head}</head><body></body></html>`,
@@ -272,7 +270,8 @@ function inlineStylesFromHeadFallback(head: string) {
 }
 
 function externalStylesFromHead(head: string) {
-  if (typeof DOMParser === "undefined") return externalStylesFromHeadFallback(head);
+  if (typeof DOMParser === "undefined")
+    return externalStylesFromHeadFallback(head);
 
   const doc = new DOMParser().parseFromString(
     `<!doctype html><html><head>${head}</head><body></body></html>`,
@@ -357,10 +356,13 @@ function collectCss(project: ProjectState) {
 
 function hoistCssImports(css: string) {
   const imports: string[] = [];
-  const body = css.replace(/^[ \t]*@import\b[^\r\n]*(?:\r?\n|$)/gim, (match) => {
-    imports.push(match.trim());
-    return "";
-  });
+  const body = css.replace(
+    /^[ \t]*@import\b[^\r\n]*(?:\r?\n|$)/gim,
+    (match) => {
+      imports.push(match.trim());
+      return "";
+    },
+  );
 
   return [...new Set(imports), body.trim()].filter(Boolean).join("\n\n");
 }
@@ -430,7 +432,9 @@ function generatePreviewHtml(input: {
   script: string;
 }) {
   const externalStyles = input.externalStyles
-    .map((href) => `  <link rel="stylesheet" href="${escapeAttribute(href)}" />`)
+    .map(
+      (href) => `  <link rel="stylesheet" href="${escapeAttribute(href)}" />`,
+    )
     .join("\n");
 
   return `<!doctype html>
@@ -716,7 +720,10 @@ function sourceLineStarts(source: string) {
   return starts;
 }
 
-function sourceLocationForOffset(lineStarts: readonly number[], offset: number) {
+function sourceLocationForOffset(
+  lineStarts: readonly number[],
+  offset: number,
+) {
   let low = 0;
   let high = lineStarts.length - 1;
   while (low <= high) {
@@ -740,7 +747,10 @@ function parseCssRules(file: string, content: string): CssRuleOrigin[] {
     const selector = match[2].trim();
     if (!selector) continue;
     const declarations = parseCssDeclarations(match[3]);
-    const start = sourceLocationForOffset(lineStarts, match.index + match[1].length);
+    const start = sourceLocationForOffset(
+      lineStarts,
+      match.index + match[1].length,
+    );
     const end = sourceLocationForOffset(lineStarts, rulePattern.lastIndex);
     const openIndex = content.indexOf("{", match.index + match[1].length);
     rules.push({
@@ -856,7 +866,10 @@ function diagnosticsFromError(error: unknown): BuildDiagnostic[] {
     warnings?: esbuild.Message[];
     message?: string;
   };
-  const messages = [...(buildError.errors ?? []), ...(buildError.warnings ?? [])];
+  const messages = [
+    ...(buildError.errors ?? []),
+    ...(buildError.warnings ?? []),
+  ];
   if (messages.length) return messages.map(diagnosticFromMessage);
   return [{ text: buildError.message ?? String(error) }];
 }
@@ -909,13 +922,9 @@ function escapeAttribute(value: string) {
 }
 
 function escapeStyleText(value: string) {
-  return value
-    .replace(/<\/style/gi, "<\\/style")
-    .replace(/<!--/g, "<\\!--");
+  return value.replace(/<\/style/gi, "<\\/style").replace(/<!--/g, "<\\!--");
 }
 
 function escapeScriptText(value: string) {
-  return value
-    .replace(/<\/script/gi, "<\\/script")
-    .replace(/<!--/g, "<\\!--");
+  return value.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
 }

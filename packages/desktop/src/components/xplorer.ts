@@ -1,4 +1,8 @@
-import type { ContextMenuAction, ContextMenuEvent, Scope } from "@nodebody/ui";
+import type {
+  ContextMenuAction,
+  ContextMenuEvent,
+  Scope,
+} from "@interfacez/ui";
 import {
   chevronRightIcon,
   delegate,
@@ -6,7 +10,7 @@ import {
   getContextMenuManager,
   render,
   signal,
-} from "@nodebody/ui";
+} from "@interfacez/ui";
 
 export interface XplorerNode {
   id: string;
@@ -34,6 +38,7 @@ export interface XplorerOptions {
 export interface XplorerContext {
   node: XplorerNode;
   event: ContextMenuEvent;
+  root?: boolean;
 }
 
 export interface XplorerContextMenuContribution {
@@ -89,6 +94,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   const expanded = new Set<string>();
   let draggedId: string | undefined;
   let loadVersion = 0;
+  let selectedSpaceRoot: XplorerNode | undefined;
   let pendingWebFolder:
     | {
         parentId: string;
@@ -99,6 +105,11 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   const renderTree = () => {
     const currentNodes = nodes.get();
     if (!currentNodes.length) {
+      if (pendingWebFolder && selectedSpaceRoot?.id === pendingWebFolder.parentId) {
+        tree.replaceChildren(renderPendingWebFolder(0));
+        focusPendingWebFolderInput();
+        return;
+      }
       if (!emptyText.get()) {
         tree.replaceChildren();
         return;
@@ -107,7 +118,11 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       tree.replaceChildren(empty);
       return;
     }
-    tree.replaceChildren(...currentNodes.map((node) => renderNode(node, 0)));
+    const renderedNodes = currentNodes.map((node) => renderNode(node, 0));
+    if (pendingWebFolder && selectedSpaceRoot?.id === pendingWebFolder.parentId) {
+      renderedNodes.push(renderPendingWebFolder(0));
+    }
+    tree.replaceChildren(...renderedNodes);
     focusPendingWebFolderInput();
   };
 
@@ -185,7 +200,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       root.classList.add("is-dragging");
       target.classList.add("is-drag-source");
       dragEvent.dataTransfer?.setData("text/plain", id);
-      dragEvent.dataTransfer?.setData("application/x-nodebody-xplorer", id);
+      dragEvent.dataTransfer?.setData("application/x-interfacez-xplorer", id);
       if (dragEvent.dataTransfer) dragEvent.dataTransfer.effectAllowed = "move";
     }),
   );
@@ -293,6 +308,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       if (version !== loadVersion) return;
     } catch {
       if (version !== loadVersion) return;
+      selectedSpaceRoot = undefined;
       expanded.clear();
       emptyText.set("Please select a space");
       nodes.set([]);
@@ -300,6 +316,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     }
 
     if (!selected) {
+      selectedSpaceRoot = undefined;
       expanded.clear();
       emptyText.set("Please select a space");
       nodes.set([]);
@@ -313,6 +330,13 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       items = [];
     }
     if (version !== loadVersion) return;
+
+    selectedSpaceRoot = {
+      id: selected.path,
+      name: selected.name,
+      kind: "folder",
+      children: items,
+    };
 
     const folderIdSet = new Set(folderIds(items));
     expanded.clear();
@@ -351,7 +375,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
           if (!context) return;
 
           if (isBaseContextMenuAction(actionId)) {
-            await runBaseContextMenuAction(actionId, context.node);
+            await runBaseContextMenuAction(actionId, context);
             return;
           }
 
@@ -367,7 +391,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   }
 
   function contextMenuActions(context: XplorerContext): ContextMenuAction[] {
-    const baseActions = baseContextMenuActions(context.node);
+    const baseActions = baseContextMenuActions(context);
     const contributedActions = contextMenuContributors()
       .flatMap((contribution) => [...contribution.getActions(context)])
       .filter((action) => action.visible !== false);
@@ -392,12 +416,29 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   ): XplorerContext | undefined {
     const row = event.target.closest<HTMLElement>("[data-xplorer-row]");
     const id = row?.dataset.xplorerRow;
-    if (!id) return undefined;
+    if (!id) {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".nb-xplorer__tree")) return undefined;
+      return selectedSpaceRoot
+        ? { node: selectedSpaceRoot, event, root: true }
+        : undefined;
+    }
     const node = findNode(nodes.get(), id);
     return node ? { node, event } : undefined;
   }
 
-  function baseContextMenuActions(node: XplorerNode): ContextMenuAction[] {
+  function baseContextMenuActions(context: XplorerContext): ContextMenuAction[] {
+    const { node } = context;
+    if (context.root) {
+      return [
+        { id: "xplorer.newFile", label: "New file" },
+        { id: "xplorer.newFolder", label: "New folder" },
+        { id: "xplorer.newWebFolder", label: "New web folder" },
+        { type: "separator", id: "xplorer.separator.create" },
+        { id: "xplorer.copyPath", label: "Copy path" },
+      ];
+    }
+
     if (node.kind === "file") {
       return [
         { id: "xplorer.open", label: "Open as tab" },
@@ -429,7 +470,11 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     ];
   }
 
-  async function runBaseContextMenuAction(actionId: string, node: XplorerNode) {
+  async function runBaseContextMenuAction(
+    actionId: string,
+    context: XplorerContext,
+  ) {
+    const { node } = context;
     switch (actionId) {
       case "xplorer.open":
         if (node.kind === "file") options.onOpenFile?.(node);
@@ -489,7 +534,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       parentId: node.id,
       value: "New web folder",
     };
-    expanded.add(node.id);
+    if (selectedSpaceRoot?.id !== node.id) expanded.add(node.id);
     renderTree();
   }
 
@@ -508,7 +553,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
         name,
       );
       pendingWebFolder = undefined;
-      expanded.add(pending.parentId);
+      if (selectedSpaceRoot?.id !== pending.parentId) expanded.add(pending.parentId);
       expanded.add(folderPath);
       await persistExpanded();
       await loadSpaceItems();

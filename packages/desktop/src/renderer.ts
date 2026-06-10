@@ -1,7 +1,7 @@
 import "./assets/index.css";
-import "@nodebody/ui/index.css";
-import "@nodebody/editor-markdown/markdown-editor.css";
-import { configureContextMenuManager, mount } from "@nodebody/ui";
+import "@interfacez/ui/index.css";
+import "@interfacez/editor-markdown/markdown-editor.css";
+import { configureContextMenuManager, mount } from "@interfacez/ui";
 import { createDesktopContextMenuBridge } from "./components/context-menu";
 import { workbench } from "./components/workbench";
 

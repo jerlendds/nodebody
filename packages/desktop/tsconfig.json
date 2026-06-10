@@ -9,8 +9,8 @@
     "sourceMap": true,
     "rootDir": "../..",
     "paths": {
-      "@nodebody/editor-markdown": ["../editor-markdown/src/index.ts"],
-      "@nodebody/ui": ["../ui/src/index.ts"]
+      "@interfacez/editor-markdown": ["../editor-markdown/src/index.ts"],
+      "@interfacez/ui": ["../ui/src/index.ts"]
     },
     "outDir": "dist",
     "moduleResolution": "bundler",

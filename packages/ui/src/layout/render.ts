@@ -14,7 +14,7 @@ import type {
 } from "./model";
 import type { LayoutTransaction } from "./transactions";
 
-const tabDragMime = "application/x-nodebody-layout-tab";
+const tabDragMime = "application/x-interfacez-layout-tab";
 
 interface DraggedTabPayload {
   stackId: LayoutNodeId;
@@ -103,7 +103,8 @@ function renderNode(
   const node = doc.nodes[nodeId];
   if (!node) throw new Error(`Missing layout node: ${nodeId}`);
 
-  if (node.kind === "stack") renderStack(host, node, doc, scope, actions, cache);
+  if (node.kind === "stack")
+    renderStack(host, node, doc, scope, actions, cache);
   else if (node.kind === "split") {
     renderSplit(host, node, doc, scope, actions, cache, currentStackId);
   } else renderContent(host, node, doc, scope, actions, cache, currentStackId);
@@ -200,7 +201,8 @@ function renderStack(
 
   const page = el("div", "nb-tab-page");
   const activeTab = doc.tabs[activeTabId(node)];
-  if (activeTab) renderNode(page, activeTab.page, doc, scope, actions, cache, node.id);
+  if (activeTab)
+    renderNode(page, activeTab.page, doc, scope, actions, cache, node.id);
   else page.append(createEmptyState());
 
   stack.append(page);
@@ -229,10 +231,7 @@ function renderSplit(
   node.childIds.forEach((childId, index) => {
     const child = el("div", "nb-split__child");
     child.dataset.splitChild = childId;
-    child.style.setProperty(
-      "--nb-split-ratio",
-      String(ratios[index] ?? 1),
-    );
+    child.style.setProperty("--nb-split-ratio", String(ratios[index] ?? 1));
     renderNode(child, childId, doc, scope, actions, cache, currentStackId);
     split.append(child);
 
@@ -270,7 +269,8 @@ function renderContent(
     const contentScope = cache ? new Scope() : scope;
     if (cache) cache.contentScopes.set(node.contentId, contentScope);
 
-    const component = content && (actions.resolveContent?.(content) ?? content.view);
+    const component =
+      content && (actions.resolveContent?.(content) ?? content.view);
     if (component) contentScope.add(mount(component, surface));
     else surface.append(createEmptyState());
   }
@@ -293,7 +293,10 @@ function bindTabDrag(
 ) {
   const onDragStart = (event: DragEvent) => {
     if (!event.dataTransfer) return;
-    const payload = JSON.stringify({ stackId, tabId } satisfies DraggedTabPayload);
+    const payload = JSON.stringify({
+      stackId,
+      tabId,
+    } satisfies DraggedTabPayload);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(tabDragMime, payload);
     event.dataTransfer.setData("text/plain", tabId);
@@ -446,10 +449,14 @@ function dropSide(surface: HTMLElement, event: DragEvent): DropSide {
 }
 
 function clearDropIndicators(root: ParentNode) {
-  for (const surface of root.querySelectorAll<HTMLElement>("[data-drop-side]")) {
+  for (const surface of root.querySelectorAll<HTMLElement>(
+    "[data-drop-side]",
+  )) {
     delete surface.dataset.dropSide;
   }
-  for (const tabbar of root.querySelectorAll<HTMLElement>("[data-drop-stack]")) {
+  for (const tabbar of root.querySelectorAll<HTMLElement>(
+    "[data-drop-stack]",
+  )) {
     delete tabbar.dataset.dropStack;
   }
 }
@@ -524,7 +531,9 @@ function bindSplitGutter(
   };
 
   gutter.addEventListener("pointerdown", onPointerDown);
-  scope.add(disposable(() => gutter.removeEventListener("pointerdown", onPointerDown)));
+  scope.add(
+    disposable(() => gutter.removeEventListener("pointerdown", onPointerDown)),
+  );
 }
 
 function bindTabScroller(tabs: HTMLElement, scope: Scope) {

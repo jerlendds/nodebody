@@ -58,11 +58,14 @@ export function registerSpacesIpc() {
     return listSpaceItems(spacePath);
   });
 
-  ipcMain.handle("spaces:setXplorerExpandedIds", async (_event, ids: string[]) => {
-    const spacePath = await getActiveSpacePath();
-    if (!spacePath) return;
-    await updateSpaceXplorerExpandedIds(spacePath, ids);
-  });
+  ipcMain.handle(
+    "spaces:setXplorerExpandedIds",
+    async (_event, ids: string[]) => {
+      const spacePath = await getActiveSpacePath();
+      if (!spacePath) return;
+      await updateSpaceXplorerExpandedIds(spacePath, ids);
+    },
+  );
 
   ipcMain.handle("spaces:setXplorerOpen", async (_event, open: boolean) => {
     const spacePath = await getActiveSpacePath();
@@ -86,11 +89,14 @@ export function registerSpacesIpc() {
     return `data:${mimeTypeForPath(resolved)};base64,${data.toString("base64")}`;
   });
 
-  ipcMain.handle("spaces:relativeItemPath", async (_event, itemPath: string) => {
-    await getActiveSpacePath();
-    const resolved = assertActiveSpaceItemPath(itemPath);
-    return path.relative(path.resolve(activeSpacePath!), resolved);
-  });
+  ipcMain.handle(
+    "spaces:relativeItemPath",
+    async (_event, itemPath: string) => {
+      await getActiveSpacePath();
+      const resolved = assertActiveSpaceItemPath(itemPath);
+      return path.relative(path.resolve(activeSpacePath!), resolved);
+    },
+  );
 
   ipcMain.handle(
     "spaces:createFile",
@@ -124,7 +130,9 @@ export function registerSpacesIpc() {
       await assertDirectory(parent);
       const folderPath = childPath(parent, name);
       await assertAvailable(folderPath);
-      await fs.mkdir(path.join(folderPath, ".web", "cache"), { recursive: true });
+      await fs.mkdir(path.join(folderPath, ".web", "cache"), {
+        recursive: true,
+      });
       await fs.mkdir(path.join(folderPath, "src"), { recursive: true });
       await Promise.all([
         fs.writeFile(
@@ -197,10 +205,7 @@ export function registerSpacesIpc() {
 }
 
 function stripWebFileArtifacts(value: string) {
-  return value.replace(
-    /web-(?:file|project):%2F[^\s"'<>`)]*?\$\d+/g,
-    "",
-  );
+  return value.replace(/web-(?:file|project):%2F[^\s"'<>`)]*?\$\d+/g, "");
 }
 
 async function getActiveSpacePath() {
@@ -342,10 +347,7 @@ async function availableTrashPath(trashPath: string, name: string) {
 
   while (!(await isPathAvailable(candidate))) {
     const suffix = ` ${index}`;
-    candidate = path.join(
-      trashPath,
-      `${parsed.name}${suffix}${parsed.ext}`,
-    );
+    candidate = path.join(trashPath, `${parsed.name}${suffix}${parsed.ext}`);
     index += 1;
   }
 
@@ -455,7 +457,7 @@ function webProjectAppTsx() {
   return (
     <main className="page">
       <section className="card">
-        <span className="eyebrow">Nodebody Web</span>
+        <span className="eyebrow">InterfaceZ Component</span>
         <h1>You've created a web project!</h1>
         <p>
           Start shaping this preview from the files in your new web folder.

@@ -17,7 +17,7 @@ export const statusBar: Component = {
     uptime.append(uptimeText);
     attachTooltip(
       uptime,
-      { text: "Nodebody knows where the time goes." },
+      { text: "InterfaceZ knows where the time goes." },
       scope,
     );
 

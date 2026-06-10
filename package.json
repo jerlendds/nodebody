@@ -1,7 +1,7 @@
 {
-  "name": "nodebody",
+  "name": "interfacez",
   "version": "1.0.0",
-  "description": "Built by Nodebody, for everybody, because Nodebody should be alone in the graph",
+  "description": "Built for everybody, because nobody should be lost in the code.",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -11,7 +11,7 @@
   },
   "author": {
     "name": "jerlendds",
-    "url": "https://github.com/jerlendds/nodebody"
+    "url": "https://github.com/jerlendds/interfacez"
   },
-  "keywords": ["nodebody"]
+  "keywords": ["interfacez"]
 }

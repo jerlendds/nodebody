@@ -1,6 +1,6 @@
-# `@nodebody/ui`
+# `@interfacez/ui`
 
-`@nodebody/ui` is the DOM workbench shell and small UI runtime for Nodebody.
+`@interfacez/ui` is the DOM workbench shell and small UI runtime for InterfaceZ.
 
 It provides a mountable component model, scoped disposables, simple signals,
 DOM helpers, trusted and sanitized HTML helpers, command shapes, workbench
@@ -33,8 +33,8 @@ contract.
 ## Basic Usage
 
 ```ts
-import "@nodebody/ui/index.css";
-import { mount } from "@nodebody/ui";
+import "@interfacez/ui/index.css";
+import { mount } from "@interfacez/ui";
 
 const root = document.querySelector("#app");
 if (!root) throw new Error("Missing #app root");
@@ -123,5 +123,5 @@ The font used for logo.svg is `Conthrax`.
 ## Status
 
 This package is currently a workbench shell and runtime foundation. It is useful
-for rendering Nodebody chrome and early panes, but it is not yet the final
+for rendering InterfaceZ chrome and early panes, but it is not yet the final
 workspace, editor, or plugin UI API.

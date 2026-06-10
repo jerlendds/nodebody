@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { ContextMenuAction } from "@nodebody/ui";
+import type { ContextMenuAction } from "@interfacez/ui";
 
 /// custom titlebar bridge
 contextBridge.exposeInMainWorld("win", {
@@ -25,16 +25,19 @@ contextBridge.exposeInMainWorld("spaces", {
     ipcRenderer.invoke("spaces:setXplorerExpandedIds", ids),
   setXplorerOpen: (open: boolean) =>
     ipcRenderer.invoke("spaces:setXplorerOpen", open),
-  readItem: (itemPath: string) => ipcRenderer.invoke("spaces:readItem", itemPath),
+  readItem: (itemPath: string) =>
+    ipcRenderer.invoke("spaces:readItem", itemPath),
   readItemDataUrl: (itemPath: string) =>
     ipcRenderer.invoke("spaces:readItemDataUrl", itemPath),
   relativeItemPath: (itemPath: string) =>
     ipcRenderer.invoke("spaces:relativeItemPath", itemPath),
   createFile: (parentPath: string, name: string) =>
-    ipcRenderer.invoke("spaces:createFile", parentPath, name).then((itemPath) => {
-      window.dispatchEvent(new CustomEvent("spaces:changed"));
-      return itemPath;
-    }),
+    ipcRenderer
+      .invoke("spaces:createFile", parentPath, name)
+      .then((itemPath) => {
+        window.dispatchEvent(new CustomEvent("spaces:changed"));
+        return itemPath;
+      }),
   createFolder: (parentPath: string, name: string) =>
     ipcRenderer
       .invoke("spaces:createFolder", parentPath, name)

@@ -5,8 +5,8 @@ import type {
   LayoutContributionSink,
   LayoutPortSink,
   Scope,
-} from "@nodebody/ui";
-import { disposable, el } from "@nodebody/ui";
+} from "@interfacez/ui";
+import { disposable, el } from "@interfacez/ui";
 import { markdownEditorExtensions } from "./extensions";
 import {
   defaultMarkdownOptions,

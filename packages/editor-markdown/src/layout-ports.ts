@@ -1,5 +1,5 @@
-import type { LayoutPortSink } from "@nodebody/ui";
-import { disposable } from "@nodebody/ui";
+import type { LayoutPortSink } from "@interfacez/ui";
+import { disposable } from "@interfacez/ui";
 import type { MarkdownEditorPlugin } from "./plugin";
 
 export function markdownLayoutPortsPlugin(

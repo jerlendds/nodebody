@@ -4,7 +4,7 @@ import {
   Menu,
   MenuItemConstructorOptions,
 } from "electron";
-import type { ContextMenuAction } from "@nodebody/ui";
+import type { ContextMenuAction } from "@interfacez/ui";
 
 export function registerContextMenuIpc() {
   ipcMain.handle(

@@ -1,7 +1,7 @@
 {
-  "name": "@nodebody/ui",
+  "name": "@interfacez/ui",
   "version": "1.0.0",
-  "description": "A sandboxed place for Nodebody to express itself.",
+  "description": "A sandboxed place for interfacez to express itself.",
   "scripts": {
     "build": "vite build"
   },
@@ -47,12 +47,7 @@
     "@codemirror/search": "^6.7.0",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.0",
-    "@huggingface/transformers": "^4.2.0",
-    "@tursodatabase/database": "^0.6.1",
-    "@lmstudio/sdk": "^1.5.0",
-    "isomorphic-git": "^1.38.3",
-    "dompurify": "^3.4.7",
-    "@nodebody/ui": "^1.0.0"
+    "dompurify": "^3.4.7"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",

@@ -7,7 +7,7 @@ import type {
   LayoutNodeId,
   LayoutTransaction,
   StackNode,
-} from "@nodebody/ui";
+} from "@interfacez/ui";
 import {
   Scope,
   signal,
@@ -24,11 +24,11 @@ import {
   applyComponentTheme,
   el,
   render,
-} from "@nodebody/ui";
+} from "@interfacez/ui";
 import {
   createMarkdownEditor,
   gfmMarkdownOptions,
-} from "@nodebody/editor-markdown";
+} from "@interfacez/editor-markdown";
 import { shouldShowWelcomeOnStartup, welcomeView } from "../pages/welcome";
 import type { ActivityItem, SidebarSide } from "./sidebar";
 import { createSidebar } from "./sidebar";
@@ -69,14 +69,14 @@ function defaultPanes(): PaneModel[] {
           ? {
               id: "welcome",
               title: "Welcome",
-              resource: "nodebody://welcome",
+              resource: "iz://welcome",
               active: true,
               view: welcomeView,
             }
           : {
               id: "empty-start",
               title: "New empty tab",
-              resource: "nodebody://empty/start",
+              resource: "iz://empty/start",
               active: true,
             },
       ],
@@ -84,7 +84,7 @@ function defaultPanes(): PaneModel[] {
   ];
 }
 
-/// Create the root Nodebody workbench shell from declarative sidebar
+/// Create the root interfacez workbench shell from declarative sidebar
 /// and pane options.
 export function workbench(options: WorkbenchOptions = {}): Component {
   return {
@@ -906,7 +906,7 @@ function createEmptySplit(
       {
         id,
         title: "New empty tab",
-        resource: `nodebody://empty/${id}`,
+        resource: `iz://empty/${id}`,
         page: `page:${id}`,
         closable: true,
       },
@@ -915,7 +915,7 @@ function createEmptySplit(
       {
         id: `content:${id}`,
         kind: "empty",
-        resource: `nodebody://empty/${id}`,
+        resource: `iz://empty/${id}`,
       },
     ],
   };
@@ -960,7 +960,7 @@ function withStartupWelcome(panes: PaneModel[]) {
   if (
     panes.some((pane) =>
       pane.tabs.some(
-        (tab) => tab.id === "welcome" || tab.resource === "nodebody://welcome",
+        (tab) => tab.id === "welcome" || tab.resource === "iz://welcome",
       ),
     )
   ) {
@@ -970,7 +970,7 @@ function withStartupWelcome(panes: PaneModel[]) {
   const welcomeTab = {
     id: "welcome",
     title: "Welcome",
-    resource: "nodebody://welcome",
+    resource: "iz://welcome",
     active: false,
     view: welcomeView,
   };
@@ -998,7 +998,7 @@ function addEmptyTab(doc: LayoutDocument, stackId: string) {
     tab: {
       id,
       title: "New empty tab",
-      resource: `nodebody://empty/${id}`,
+      resource: `iz://empty/${id}`,
       page: `page:${id}`,
       closable: true,
     },
@@ -1010,7 +1010,7 @@ function addEmptyTab(doc: LayoutDocument, stackId: string) {
     content: {
       id: `content:${id}`,
       kind: "empty",
-      resource: `nodebody://empty/${id}`,
+      resource: `iz://empty/${id}`,
     },
     activate: true,
   });

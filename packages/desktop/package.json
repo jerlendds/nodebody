@@ -1,8 +1,8 @@
 {
-  "name": "nodebody",
-  "productName": "nodebody",
+  "name": "interfacez",
+  "productName": "interfacez",
   "version": "1.0.0",
-  "description": "Nodebodys desktop application.",
+  "description": "interfacez desktop application.",
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
@@ -14,17 +14,9 @@
     "test:e2e": "wdio run ./wdio.conf.cjs"
   },
   "keywords": [
-    "graph",
-    "nodebody",
-    "network-graph",
-    "graph-state",
-    "transactional-state",
-    "state-management",
-    "nodes",
-    "edges",
+    "interfacez",
     "extension-system",
     "plugin-system",
-    "graph-visualization",
     "modular",
     "composable",
     "interactive",
@@ -33,10 +25,10 @@
   ],
   "author": {
     "name": "jerlendds",
-    "url": "https://github.com/jerlendds/nodebody"
+    "url": "https://github.com/jerlendds/interfacez"
   },
   "repository": {
-    "url": "https://github.com/jerlendds/nodebody"
+    "url": "https://github.com/jerlendds/interfacez"
   },
   "type": "commonjs",
   "devDependencies": {
@@ -67,9 +59,12 @@
     "wdio-wait-for": "^3.1.1"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@tursodatabase/database": "^0.6.1",
+    "isomorphic-git": "^1.38.3",
     "@lmstudio/sdk": "^1.5.0",
-    "@nodebody/editor-markdown": "^1.0.0",
-    "@nodebody/ui": "^1.0.0",
+    "@interfacez/editor-markdown": "^1.0.0",
+    "@interfacez/ui": "^1.0.0",
     "dompurify": "^3.4.8",
     "electron-squirrel-startup": "^1.0.1",
     "esbuild-wasm": "^0.28.0",

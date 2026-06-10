@@ -1,13 +1,8 @@
-import type { Component } from "@nodebody/ui";
-import { disposable, el } from "@nodebody/ui";
+import type { Component } from "@interfacez/ui";
+import { disposable, el } from "@interfacez/ui";
 import PreviewBuildWorker from "./web-project-preview.worker?worker";
 
-type ProjectLanguage =
-  | "typescript"
-  | "javascript"
-  | "html"
-  | "css"
-  | "json";
+type ProjectLanguage = "typescript" | "javascript" | "html" | "css" | "json";
 
 interface ProjectFile {
   path: string;
@@ -186,7 +181,11 @@ export function createWebProjectPreview(
           }
           latestBuild = response.output;
           renderDiagnostics(response.output.diagnostics);
-          if (latestProject && response.output.css && pendingBuildMode === "css-only") {
+          if (
+            latestProject &&
+            response.output.css &&
+            pendingBuildMode === "css-only"
+          ) {
             preview.contentWindow?.postMessage(
               { type: "css-update", css: response.output.css },
               "*",
@@ -223,7 +222,9 @@ export function createWebProjectPreview(
       inspectButton.setAttribute("aria-pressed", "false");
       inspectButton.addEventListener("click", toggleInspectMode);
       scope.add(
-        disposable(() => inspectButton.removeEventListener("click", toggleInspectMode)),
+        disposable(() =>
+          inspectButton.removeEventListener("click", toggleInspectMode),
+        ),
       );
 
       const onPreviewMessage = (event: MessageEvent) => {
@@ -246,7 +247,10 @@ export function createWebProjectPreview(
         }
         if (event.data.type === "runtime-error") {
           renderDiagnostics([
-            { text: event.data.stack ?? event.data.message, location: "runtime" },
+            {
+              text: event.data.stack ?? event.data.message,
+              location: "runtime",
+            },
           ]);
         }
         if (event.data.type === "console" && event.data.level === "error") {
@@ -255,7 +259,9 @@ export function createWebProjectPreview(
       };
       window.addEventListener("message", onPreviewMessage);
       scope.add(
-        disposable(() => window.removeEventListener("message", onPreviewMessage)),
+        disposable(() =>
+          window.removeEventListener("message", onPreviewMessage),
+        ),
       );
 
       void loadAndBuild();
@@ -263,8 +269,11 @@ export function createWebProjectPreview(
       const onWebFileSaved = (event: Event) => {
         const detail = (event as CustomEvent<{ filePath?: string }>).detail;
         const changedPath = detail?.filePath;
-        if (!changedPath || !isPathInside(options.rootPath, changedPath)) return;
-        void loadAndBuild(fileExtension(changedPath) === ".css" ? "css-only" : "full");
+        if (!changedPath || !isPathInside(options.rootPath, changedPath))
+          return;
+        void loadAndBuild(
+          fileExtension(changedPath) === ".css" ? "css-only" : "full",
+        );
       };
       window.addEventListener("nb:web-file-saved", onWebFileSaved);
       scope.add(
@@ -336,7 +345,10 @@ export function createWebProjectPreview(
 
       function renderInspectorPanel() {
         inspectorPanel.replaceChildren();
-        shell.classList.toggle("has-inspector-selection", Boolean(selectedElement));
+        shell.classList.toggle(
+          "has-inspector-selection",
+          Boolean(selectedElement),
+        );
         if (!selectedElement) return;
 
         const heading = el("div", "nb-web-project__inspector-heading");
@@ -356,12 +368,20 @@ export function createWebProjectPreview(
           : "No source location";
         sourceButton.disabled = !selectedElement.source;
         sourceButton.addEventListener("click", () => {
-          if (selectedElement?.source) options.onOpenSource?.(selectedElement.source);
+          if (selectedElement?.source)
+            options.onOpenSource?.(selectedElement.source);
         });
 
-        const rules = matchedProjectRules(selectedElement, latestBuild?.cssRules ?? []);
+        const rules = matchedProjectRules(
+          selectedElement,
+          latestBuild?.cssRules ?? [],
+        );
         const ruleSection = el("section", "nb-web-project__inspector-section");
-        const ruleTitle = el("h3", "nb-web-project__inspector-section-title", "Matched rules");
+        const ruleTitle = el(
+          "h3",
+          "nb-web-project__inspector-section-title",
+          "Matched rules",
+        );
         const ruleList = el("div", "nb-web-project__rule-list");
         if (rules.length) {
           for (const rule of rules) {
@@ -377,7 +397,11 @@ export function createWebProjectPreview(
         ruleSection.append(ruleTitle, ruleList);
 
         const styleSection = el("section", "nb-web-project__inspector-section");
-        const styleTitle = el("h3", "nb-web-project__inspector-section-title", "Styles");
+        const styleTitle = el(
+          "h3",
+          "nb-web-project__inspector-section-title",
+          "Styles",
+        );
         const styleGrid = el("div", "nb-web-project__style-grid");
         for (const property of editableStyleProperties) {
           const label = el("label", "nb-web-project__style-field");
@@ -386,12 +410,18 @@ export function createWebProjectPreview(
           }
           const name = el("span", "nb-web-project__style-name", property);
           const control = el("div", "nb-web-project__style-control");
-          const input = el("input", "nb-web-project__style-input") as HTMLInputElement;
+          const input = el(
+            "input",
+            "nb-web-project__style-input",
+          ) as HTMLInputElement;
           input.value = selectedElement.computedStyle[property] ?? "";
           bindStyleInputAutosave(input, property);
           control.append(input);
 
-          if (isColorStyleProperty(property) && parseColorOrUndefined(input.value)) {
+          if (
+            isColorStyleProperty(property) &&
+            parseColorOrUndefined(input.value)
+          ) {
             const swatch = el(
               "button",
               "nb-web-project__color-swatch",
@@ -548,7 +578,10 @@ export function createWebProjectPreview(
         );
       }
 
-      function bindStyleInputAutosave(input: HTMLInputElement, property: string) {
+      function bindStyleInputAutosave(
+        input: HTMLInputElement,
+        property: string,
+      ) {
         let saveTimer: number | undefined;
         let lastQueuedValue = input.value;
 
@@ -870,7 +903,13 @@ class GradientEditor {
     this.stopsList = document.createElement("div");
     this.stopsList.className = "ge-stops";
 
-    this.root.append(titlebar, header, this.preview, stopsHeader, this.stopsList);
+    this.root.append(
+      titlebar,
+      header,
+      this.preview,
+      stopsHeader,
+      this.stopsList,
+    );
     container.append(this.root);
 
     close.addEventListener("click", () => this.onClose?.());
@@ -993,7 +1032,9 @@ class GradientEditor {
       opacity.min = "0";
       opacity.max = "100";
       opacity.step = "1";
-      opacity.value = String(Math.round((parseColorOrUndefined(stop.color)?.a ?? 1) * 100));
+      opacity.value = String(
+        Math.round((parseColorOrUndefined(stop.color)?.a ?? 1) * 100),
+      );
 
       opacity.addEventListener("change", () => {
         const parsed = parseColorOrUndefined(stop.color);
@@ -1018,7 +1059,11 @@ class GradientEditor {
   private bindStopDrag(handle: HTMLElement, stop: GradientStop) {
     const move = (event: PointerEvent) => {
       const rect = this.preview.getBoundingClientRect();
-      stop.position = clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
+      stop.position = clamp(
+        ((event.clientX - rect.left) / rect.width) * 100,
+        0,
+        100,
+      );
       handle.style.left = `${stop.position}%`;
       this.renderPreviewOnly();
       this.emit();
@@ -1072,7 +1117,9 @@ async function readProjectState(rootPath: string): Promise<ProjectState> {
     };
   }
 
-  const dependencies = dependenciesFromPackageJson(files["/package.json"]?.content);
+  const dependencies = dependenciesFromPackageJson(
+    files["/package.json"]?.content,
+  );
   return {
     files,
     entry: pickEntry(files),
@@ -1089,7 +1136,10 @@ function flattenFiles(items: readonly SpaceItem[]): SpaceItem[] {
   return files;
 }
 
-function findNode(nodes: readonly SpaceItem[], id: string): SpaceItem | undefined {
+function findNode(
+  nodes: readonly SpaceItem[],
+  id: string,
+): SpaceItem | undefined {
   for (const node of nodes) {
     if (node.id === id) return node;
     const child = findNode(node.children ?? [], id);
@@ -1167,7 +1217,9 @@ function normalizePath(path: string) {
 function isPreviewMessage(value: unknown): value is PreviewMessage {
   if (!value || typeof value !== "object") return false;
   const message = value as { source?: unknown; type?: unknown };
-  return message.source === "preview-runtime" && typeof message.type === "string";
+  return (
+    message.source === "preview-runtime" && typeof message.type === "string"
+  );
 }
 
 function errorMessage(error: unknown) {
@@ -1178,7 +1230,10 @@ function sanitizeInspectedPayload(
   payload: InspectedElementPayload,
 ): InspectedElementPayload | undefined {
   if (!payload || typeof payload !== "object") return undefined;
-  if (typeof payload.selector !== "string" || typeof payload.tagName !== "string") {
+  if (
+    typeof payload.selector !== "string" ||
+    typeof payload.tagName !== "string"
+  ) {
     return undefined;
   }
   return {
@@ -1187,7 +1242,9 @@ function sanitizeInspectedPayload(
     tagName: payload.tagName.slice(0, 40),
     id: optionalString(payload.id, 120),
     classList: Array.isArray(payload.classList)
-      ? payload.classList.filter((item) => typeof item === "string").slice(0, 100)
+      ? payload.classList
+          .filter((item) => typeof item === "string")
+          .slice(0, 100)
       : [],
     attributes: safeStringRecord(payload.attributes, 50, 500),
     textPreview: optionalString(payload.textPreview, 200),
@@ -1247,11 +1304,15 @@ function safeStringRecord(
 }
 
 function optionalString(value: unknown, maxLength: number) {
-  return typeof value === "string" && value ? value.slice(0, maxLength) : undefined;
+  return typeof value === "string" && value
+    ? value.slice(0, maxLength)
+    : undefined;
 }
 
 function positiveInteger(value: unknown) {
-  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : undefined;
+  return Number.isInteger(value) && Number(value) > 0
+    ? Number(value)
+    : undefined;
 }
 
 function finiteNumber(value: unknown) {
@@ -1272,7 +1333,10 @@ function isGradientStyleProperty(property: string) {
 
 function elementLabel(payload: InspectedElementPayload) {
   const id = payload.id ? `#${payload.id}` : "";
-  const classes = payload.classList.slice(0, 3).map((item) => `.${item}`).join("");
+  const classes = payload.classList
+    .slice(0, 3)
+    .map((item) => `.${item}`)
+    .join("");
   return `${payload.tagName}${id}${classes}`;
 }
 
@@ -1406,9 +1470,17 @@ function isPathInside(rootPath: string, filePath: string) {
   return file === root || file.startsWith(`${root}/`);
 }
 
-const colorStyleProperties = new Set(["color", "backgroundColor", "borderColor"]);
+const colorStyleProperties = new Set([
+  "color",
+  "backgroundColor",
+  "borderColor",
+]);
 const gradientStyleProperties = new Set(["background", "backgroundImage"]);
-const longStyleProperties = new Set(["background", "backgroundImage", "border"]);
+const longStyleProperties = new Set([
+  "background",
+  "backgroundImage",
+  "border",
+]);
 
 function parseLinearGradient(input: string): LinearGradientValue | undefined {
   const value = input.trim();
@@ -1571,7 +1643,10 @@ function midpointStopPosition(stops: readonly GradientStop[]) {
   for (let index = 1; index < sorted.length - 1; index += 1) {
     const start = sorted[index];
     const end = sorted[index + 1];
-    if (end.position - start.position > widestEnd.position - widestStart.position) {
+    if (
+      end.position - start.position >
+      widestEnd.position - widestStart.position
+    ) {
       widestStart = start;
       widestEnd = end;
     }
@@ -1639,9 +1714,7 @@ function rgbaToHex({ r, g, b, a }: RGBA) {
   const toHex = (value: number) => value.toString(16).padStart(2, "0");
   const alpha = Math.round(a * 255);
 
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}${
-    alpha < 255 ? toHex(alpha) : ""
-  }`;
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}${alpha < 255 ? toHex(alpha) : ""}`;
 }
 
 function rgbaToCss({ r, g, b, a }: RGBA) {
@@ -1670,9 +1743,7 @@ function parseColorOrUndefined(input: string) {
 
 function parseColor(input: string): RGBA {
   const rawValue = input.trim();
-  const value = /^[0-9a-fA-F]{3,8}$/.test(rawValue)
-    ? `#${rawValue}`
-    : rawValue;
+  const value = /^[0-9a-fA-F]{3,8}$/.test(rawValue) ? `#${rawValue}` : rawValue;
 
   if (value.startsWith("#")) {
     const hex = value.slice(1);
@@ -1693,9 +1764,7 @@ function parseColor(input: string): RGBA {
     const g = parseInt(normalized.slice(2, 4), 16);
     const b = parseInt(normalized.slice(4, 6), 16);
     const a =
-      normalized.length === 8
-        ? parseInt(normalized.slice(6, 8), 16) / 255
-        : 1;
+      normalized.length === 8 ? parseInt(normalized.slice(6, 8), 16) / 255 : 1;
 
     if ([r, g, b, a].some((channel) => Number.isNaN(channel))) {
       throw new Error("Invalid hex color.");

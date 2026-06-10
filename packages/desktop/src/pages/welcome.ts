@@ -1,4 +1,4 @@
-import type { Component } from "@nodebody/ui";
+import type { Component } from "@interfacez/ui";
 import {
   abcIcon,
   bulbIcon,
@@ -12,12 +12,12 @@ import {
   render,
   signingADocumentIcon,
   spaceshipLaunchDocumentationIcon,
-} from "@nodebody/ui";
-import type { TrustedHtml } from "@nodebody/ui";
+} from "@interfacez/ui";
+import type { TrustedHtml } from "@interfacez/ui";
 
 type StartAction = "create-space" | "open-space" | "open-settings";
 
-export const welcomeStartupPreferenceKey = "nodebody.showWelcomeOnStartup";
+export const welcomeStartupPreferenceKey = "interfacez.showWelcomeOnStartup";
 
 const starts: [StartAction, string, TrustedHtml][] = [
   ["create-space", "Create new space...", spaceshipLaunchDocumentationIcon],
@@ -42,12 +42,11 @@ function createIntro() {
   const section = el("section", "nb-welcome__intro");
   render(
     section,
-    html`<h1>Nodebody</h1>
+    html`<h1>InterfaceZ</h1>
       <p>
         <!-- Novel, networked, notebooks to augment, adapt, and program your -->
         <!-- knowledge. -->
-        Modular. Malleable. Media. Nodebody turns knowledge into a medium you
-        can shape.
+        Modular. Malleable. Media. Turn code into a medium you can shape.
       </p>`,
   );
 
@@ -204,17 +203,10 @@ function createWalkthroughs() {
   const section = el("section", "nb-welcome__walkthroughs");
   section.append(el("h2", "", "Walkthroughs"));
 
-  [
-    "Get started with Nodebody",
-    "Learn the Fundamentals",
-    "Research with Nodebody",
-    "Make work addressable",
-  ];
-
   const walkthroughs = [
-    ["Get started with Nodebody", abcIcon],
+    ["Get started with InterfaceZ", abcIcon],
     ["Learn the Fundamentals", leafIcon],
-    ["Research with Nodebody", bulbIcon],
+    ["Design with InterfaceZ", bulbIcon],
     ["Make malleable software", codeFileIcon],
   ];
 
@@ -231,7 +223,7 @@ function createWalkthroughs() {
   const announcements = el("div", "nb-welcome__block");
   render(
     announcements,
-    html`<h2>Nodebody Announcements</h2>
+    html`<h2>InterfaceZ Announcements</h2>
       <button class="nb-welcome__link">Local-first resource graphs</button>
       <button class="nb-welcome__link">
         Transactions, facets, and plugins

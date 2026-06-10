@@ -3,8 +3,8 @@ import type {
   TrustedHtml,
   PaneModel,
   Scope,
-} from "@nodebody/ui";
-import { cogIcon, attachTooltip, el, render } from "@nodebody/ui";
+} from "@interfacez/ui";
+import { cogIcon, attachTooltip, el, render } from "@interfacez/ui";
 
 /// The side where the fixed activity rail is placed.
 export type SidebarSide = "left" | "right";

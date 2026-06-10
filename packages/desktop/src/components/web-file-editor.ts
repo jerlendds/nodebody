@@ -1,5 +1,5 @@
-import type { Component } from "@nodebody/ui";
-import { disposable, el } from "@nodebody/ui";
+import type { Component } from "@interfacez/ui";
+import { disposable, el } from "@interfacez/ui";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";

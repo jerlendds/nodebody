@@ -15,26 +15,26 @@ export interface SpacesStore {
   selectedSpacePath?: string;
 }
 
-const NodebodyDirName = "nodebody";
+const izDirName = "interfacez";
 const SpacesFileName = "spaces.json";
 
-export function getNodebodyDataDir() {
-  return path.join(app.getPath("appData"), NodebodyDirName);
+export function getIzDataDir() {
+  return path.join(app.getPath("appData"), izDirName);
 }
 
-export function getNodebodyDataFile(name: string) {
-  return path.join(getNodebodyDataDir(), name);
+export function getIzDataFile(name: string) {
+  return path.join(getIzDataDir(), name);
 }
 
-export async function ensureNodebodyDataDir() {
-  const dir = getNodebodyDataDir();
+export async function ensureIzDataDir() {
+  const dir = getIzDataDir();
   await fs.mkdir(dir, { recursive: true });
   return dir;
 }
 
 export async function readSpacesStore(): Promise<SpacesStore> {
   try {
-    const raw = await fs.readFile(getNodebodyDataFile(SpacesFileName), "utf8");
+    const raw = await fs.readFile(getIzDataFile(SpacesFileName), "utf8");
     return normalizeSpacesStore(JSON.parse(raw));
   } catch (error) {
     if (isErrorWithCode(error, "ENOENT")) {
@@ -45,9 +45,9 @@ export async function readSpacesStore(): Promise<SpacesStore> {
 }
 
 export async function writeSpacesStore(store: SpacesStore) {
-  await ensureNodebodyDataDir();
+  await ensureIzDataDir();
   await fs.writeFile(
-    getNodebodyDataFile(SpacesFileName),
+    getIzDataFile(SpacesFileName),
     `${JSON.stringify(normalizeSpacesStore(store), null, 2)}\n`,
     "utf8",
   );
@@ -115,9 +115,7 @@ export async function updateSpaceXplorerExpandedIds(
   await writeSpacesStore({
     ...store,
     spaces: store.spaces.map((space) =>
-      space.path === spacePath
-        ? { ...space, xplorerExpandedIds }
-        : space,
+      space.path === spacePath ? { ...space, xplorerExpandedIds } : space,
     ),
   });
 }

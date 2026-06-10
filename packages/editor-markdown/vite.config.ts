@@ -5,15 +5,15 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^@nodebody\/ui$/,
+        find: /^@interfacez\/ui$/,
         replacement: resolve(__dirname, "../ui/src/index.ts"),
       },
       {
-        find: /^@nodebody\/ui\/index\.css$/,
+        find: /^@interfacez\/ui\/index\.css$/,
         replacement: resolve(__dirname, "../ui/src/index.css"),
       },
       {
-        find: /^@nodebody\/ui\/(.*)$/,
+        find: /^@interfacez\/ui\/(.*)$/,
         replacement: resolve(__dirname, "../ui/src/$1"),
       },
     ],
@@ -33,7 +33,7 @@ export default defineConfig({
         "@codemirror/search",
         "@codemirror/state",
         "@codemirror/view",
-        "@nodebody/ui",
+        "@interfacez/ui",
       ],
     },
   },

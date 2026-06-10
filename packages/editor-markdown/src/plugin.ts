@@ -4,8 +4,8 @@ import type {
   ContextMenuAction,
   ContextMenuEvent,
   Disposable,
-} from "@nodebody/ui";
-import { disposable } from "@nodebody/ui";
+} from "@interfacez/ui";
+import { disposable } from "@interfacez/ui";
 import type { MarkdownDocumentModel, MarkdownOptions } from "./options";
 
 export type MarkdownPluginCapability =
@@ -95,7 +95,9 @@ export class MarkdownEditorHost implements Disposable {
     }
 
     if (this.plugins.has(plugin.id)) {
-      throw new Error(`Markdown editor plugin already registered: ${plugin.id}`);
+      throw new Error(
+        `Markdown editor plugin already registered: ${plugin.id}`,
+      );
     }
 
     this.plugins.set(plugin.id, plugin);
