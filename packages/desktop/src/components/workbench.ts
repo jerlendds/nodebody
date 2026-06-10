@@ -19,14 +19,9 @@ import {
   disposable,
   getContextMenuManager,
   getHotkeyManager,
-  borderRadiusIcon,
   folderIcon,
   folderOpenIcon,
   paletteIcon,
-  paintIcon,
-  shadowsIcon,
-  spacingHorizontalIcon,
-  typographyIcon,
   applyComponentTheme,
   el,
   render,
@@ -72,38 +67,6 @@ const defaultActivities = [
 ];
 
 const minXplorerWidth = 136;
-const designSystemCategories = [
-  {
-    id: "color",
-    label: "Colors",
-    meta: "Surfaces, borders, text",
-    icon: paintIcon,
-  },
-  {
-    id: "spacing",
-    label: "Spacing",
-    meta: "Gaps, padding, rhythm",
-    icon: spacingHorizontalIcon,
-  },
-  {
-    id: "typography",
-    label: "Typography",
-    meta: "Type, size, weight",
-    icon: typographyIcon,
-  },
-  {
-    id: "radius",
-    label: "Radius",
-    meta: "Corners and controls",
-    icon: borderRadiusIcon,
-  },
-  {
-    id: "shadow",
-    label: "Shadows",
-    meta: "Elevation and focus",
-    icon: shadowsIcon,
-  },
-] as const;
 
 function defaultPanes(): PaneModel[] {
   return [
@@ -178,7 +141,6 @@ export function workbench(options: WorkbenchOptions = {}): Component {
         },
         scope,
       );
-      const designSystemPanel = createDesignSystemPanel();
       const sidebar = createSidebar(
         {
           side,
@@ -189,13 +151,7 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       );
       const paneMount = document.createElement("div");
       paneMount.className = "nb-pane-mount";
-      root.replaceChildren(
-        toolbar,
-        sidebar,
-        xplorer,
-        designSystemPanel,
-        paneMount,
-      );
+      root.replaceChildren(toolbar, sidebar, xplorer, paneMount);
       scope.add(mount(statusBar, root));
       const savingTabIds = new Set<string>();
       const setTabSavingState = (tabId: string, saving: boolean) => {
@@ -220,7 +176,12 @@ export function workbench(options: WorkbenchOptions = {}): Component {
         layout.subscribe(() => {
           layoutRenderer.update(layout.get());
           applyTabSavingStates(root, savingTabIds);
-          updateDesignSystemPanelState();
+          updateActivityButtons(
+            root,
+            activeActivity.get(),
+            isXplorerOpen.get(),
+            isVariablesActive(layout.get()),
+          );
         }),
       );
 
@@ -295,10 +256,7 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           const open = isXplorerOpen.get();
           root.classList.toggle("is-xplorer-open", open);
           xplorer.classList.toggle("is-open", open);
-          xplorer.setAttribute(
-            "aria-hidden",
-            String(!open || isVariablesActive(layout.get())),
-          );
+          xplorer.setAttribute("aria-hidden", String(!open));
           updateActivityButtons(
             root,
             activeActivity.get(),
@@ -318,7 +276,6 @@ export function workbench(options: WorkbenchOptions = {}): Component {
       );
 
       void restoreXplorerOpenState();
-      updateDesignSystemPanelState();
 
       async function openSpaceFile(filePath: string, title: string) {
         if (isMarkdownFile(title)) {
@@ -639,63 +596,8 @@ export function workbench(options: WorkbenchOptions = {}): Component {
         );
       }
 
-      function updateDesignSystemPanelState() {
-        const variablesActive = isVariablesActive(layout.get());
-        root.classList.toggle("is-design-system-panel-open", variablesActive);
-        designSystemPanel.classList.toggle("is-open", variablesActive);
-        designSystemPanel.setAttribute(
-          "aria-hidden",
-          String(!variablesActive),
-        );
-        xplorer.setAttribute(
-          "aria-hidden",
-          String(variablesActive || !isXplorerOpen.get()),
-        );
-        updateActivityButtons(
-          root,
-          activeActivity.get(),
-          isXplorerOpen.get(),
-          variablesActive,
-        );
-      }
     },
   };
-}
-
-function createDesignSystemPanel() {
-  const root = el("aside", "nb-design-nav");
-  root.setAttribute("aria-label", "Design system categories");
-  root.setAttribute("aria-hidden", "true");
-
-  const header = el("div", "nb-design-nav__header");
-  header.append(el("span", "nb-design-nav__title", "Design system"));
-
-  const list = el("nav", "nb-design-nav__list");
-  list.setAttribute("aria-label", "Variables categories");
-
-  for (const item of designSystemCategories) {
-    const button = el("button", "nb-design-nav__item") as HTMLButtonElement;
-    button.type = "button";
-    button.dataset.tokenGroupTarget = item.id;
-    const icon = el("span", "nb-design-nav__icon");
-    render(icon, item.icon);
-    button.append(
-      icon,
-      el("span", "nb-design-nav__label", item.label),
-      el("span", "nb-design-nav__meta", item.meta),
-    );
-    button.addEventListener("click", () => {
-      window.dispatchEvent(
-        new CustomEvent("nb:variables-jump", {
-          detail: { groupId: item.id },
-        }),
-      );
-    });
-    list.append(button);
-  }
-
-  root.append(header, list);
-  return root;
 }
 
 function pathFromVirtual(rootPath: string, virtualPath: string) {
@@ -966,7 +868,7 @@ function updateActivityButtons(
       activity === "variables"
         ? isVariablesActive || activity === activeActivity
         : activity === "xplorer"
-        ? isXplorerOpen && !isVariablesActive
+        ? isXplorerOpen
         : activity === activeActivity;
     item.classList.toggle(
       "is-active",

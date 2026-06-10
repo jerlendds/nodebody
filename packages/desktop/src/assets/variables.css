@@ -89,11 +89,97 @@
   font-size: 12px;
 }
 
+.nb-variables__content {
+  display: grid;
+  grid-template-columns: 0 minmax(0, 1fr);
+  column-gap: 0;
+  align-items: start;
+  min-height: calc(100vh - 170px);
+  width: min(100%, 1180px);
+}
+
+.nb-variables-tabs {
+  grid-column: 1;
+  position: sticky;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 142px;
+  padding: 6px 0;
+  transform: translate(calc(-100% - 24px), -50%);
+}
+
+.nb-variables-tabs__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--nb-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.nb-variables-tabs__item:hover,
+.nb-variables-tabs__item:focus-visible,
+.nb-variables-tabs__item.is-active {
+  color: var(--nb-accent-soft);
+  outline: none;
+}
+
+.nb-variables-tabs__icon {
+  display: grid;
+  flex: 0 0 24px;
+  place-items: center;
+  line-height: 1;
+}
+
+.nb-variables-tabs__icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.nb-variables-tabs__label {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nb-variables-tabs__indicator {
+  position: absolute;
+  left: -6px;
+  width: 2px;
+  height: 18px;
+  border-radius: 1px;
+  background: var(--nb-accent-soft);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.nb-variables-tabs__item.is-active .nb-variables-tabs__indicator {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
 .nb-token-grid {
+  grid-column: 2;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: min(100%, 1180px);
+  min-width: 0;
+  width: 100%;
 }
 
 .nb-token-card {
@@ -352,6 +438,42 @@
 @media (max-width: 720px) {
   .nb-variables {
     padding: 16px;
+  }
+
+  .nb-variables__content {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    row-gap: 12px;
+  }
+
+  .nb-variables-tabs {
+    grid-column: 1;
+    position: static;
+    flex-direction: row;
+    justify-content: flex-start;
+    width: auto;
+    overflow-x: auto;
+    transform: none;
+  }
+
+  .nb-token-grid {
+    grid-column: 1;
+  }
+
+  .nb-variables-tabs__item {
+    flex: 0 0 auto;
+  }
+
+  .nb-variables-tabs__indicator {
+    left: auto;
+    bottom: -3px;
+    width: 18px;
+    height: 2px;
+    transform: scaleX(0.4);
+  }
+
+  .nb-variables-tabs__item.is-active .nb-variables-tabs__indicator {
+    transform: scaleX(1);
   }
 
   .nb-token-row {

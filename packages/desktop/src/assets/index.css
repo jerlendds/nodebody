@@ -91,10 +91,6 @@
   --nb-xplorer-column-width: var(--nb-xplorer-width);
 }
 
-.nb-workbench.is-design-system-panel-open {
-  --nb-xplorer-column-width: var(--nb-xplorer-width);
-}
-
 .nb-workbench--sidebar-right {
   grid-template:
     "toolbar toolbar toolbar" var(--nb-toolbar-height)

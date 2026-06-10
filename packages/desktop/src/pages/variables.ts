@@ -11,11 +11,13 @@ import {
   shadowsIcon,
   spacingHorizontalIcon,
   typographyIcon,
+  variableIcon,
 } from "@interfacez/ui";
 import type { TrustedHtml } from "@interfacez/ui";
 
 type TokenKind = "color" | "spacing" | "typography" | "radius" | "shadow";
 type TokenTier = "Primitive" | "Semantic" | "Component";
+type VariablesPageId = "all" | TokenKind;
 
 interface DesignToken {
   name: string;
@@ -36,6 +38,21 @@ interface DesignTokenDocument {
   version: 1;
   groups: TokenGroup[];
 }
+
+interface VariablesTab {
+  id: VariablesPageId;
+  label: string;
+  icon?: TrustedHtml;
+}
+
+const variablesTabs: VariablesTab[] = [
+  { id: "all", label: "All", icon: variableIcon },
+  { id: "color", label: "Colors", icon: paintIcon },
+  { id: "spacing", label: "Spacing", icon: spacingHorizontalIcon },
+  { id: "typography", label: "Typography", icon: typographyIcon },
+  { id: "radius", label: "Radius", icon: borderRadiusIcon },
+  { id: "shadow", label: "Shadows", icon: shadowsIcon },
+];
 
 const defaultDesignTokens: DesignTokenDocument = {
   version: 1,
@@ -286,6 +303,8 @@ const defaultDesignTokens: DesignTokenDocument = {
 export const variablesView: Component = {
   mount(root, scope) {
     let disposed = false;
+    let activePage: VariablesPageId = "all";
+    let tokenGroups = cloneTokenDocument(defaultDesignTokens).groups;
     scope.add(
       disposable(() => {
         disposed = true;
@@ -293,31 +312,24 @@ export const variablesView: Component = {
     );
 
     const page = el("section", "nb-variables");
+    const tabs = createVariablesTabs((pageId) => {
+      activePage = pageId;
+      updateVariablesTabs(tabs, activePage);
+      renderTokenGrid(grid, tokenGroups, activePage);
+    });
     const grid = el("div", "nb-token-grid");
-    page.append(createHero(scope), grid);
+    const content = el("div", "nb-variables__content");
+    content.append(tabs, grid);
+    page.append(createHero(scope), content);
     root.replaceChildren(page);
 
-    renderTokenGrid(grid, defaultDesignTokens.groups);
-    const onJump = (event: Event) => {
-      const groupId = (
-        event as CustomEvent<{
-          groupId?: string;
-        }>
-      ).detail?.groupId;
-      if (!groupId) return;
-      collapseAllExcept(page, groupId);
-      page
-        .querySelector<HTMLElement>(`[data-token-group="${groupId}"]`)
-        ?.scrollIntoView({ block: "start", behavior: "smooth" });
-    };
-    window.addEventListener("nb:variables-jump", onJump);
-    scope.add(
-      disposable(() => window.removeEventListener("nb:variables-jump", onJump)),
-    );
+    updateVariablesTabs(tabs, activePage);
+    renderTokenGrid(grid, tokenGroups, activePage);
 
     void loadTokenDocument().then(({ document }) => {
       if (disposed) return;
-      renderTokenGrid(grid, document.groups);
+      tokenGroups = document.groups;
+      renderTokenGrid(grid, tokenGroups, activePage);
     });
   },
 };
@@ -353,11 +365,52 @@ function createHero(scope: Parameters<Component["mount"]>[1]) {
   return hero;
 }
 
-function renderTokenGrid(grid: HTMLElement, groups: TokenGroup[]) {
+function createVariablesTabs(onSelect: (pageId: VariablesPageId) => void) {
+  const nav = el("nav", "nb-variables-tabs");
+  nav.setAttribute("aria-label", "Variables pages");
+
+  for (const tab of variablesTabs) {
+    const button = el("button", "nb-variables-tabs__item") as HTMLButtonElement;
+    button.type = "button";
+    button.dataset.variablesPage = tab.id;
+    button.setAttribute("aria-label", tab.label);
+
+    const icon = el("span", "nb-variables-tabs__icon");
+    if (tab.icon) render(icon, tab.icon);
+    const label = el("span", "nb-variables-tabs__label", tab.label);
+    if (tab.icon) button.append(icon);
+    button.append(label, el("span", "nb-variables-tabs__indicator"));
+    button.addEventListener("click", () => onSelect(tab.id));
+    nav.append(button);
+  }
+
+  return nav;
+}
+
+function updateVariablesTabs(root: ParentNode, activePage: VariablesPageId) {
+  for (const item of root.querySelectorAll<HTMLButtonElement>(
+    "[data-variables-page]",
+  )) {
+    const active = item.dataset.variablesPage === activePage;
+    item.classList.toggle("is-active", active);
+    item.setAttribute("aria-current", active ? "page" : "false");
+  }
+}
+
+function renderTokenGrid(
+  grid: HTMLElement,
+  groups: TokenGroup[],
+  activePage: VariablesPageId,
+) {
   grid.replaceChildren();
-  for (const group of groups) {
+  for (const group of visibleGroups(groups, activePage)) {
     grid.append(createTokenCard(sortGroup(group)));
   }
+}
+
+function visibleGroups(groups: TokenGroup[], activePage: VariablesPageId) {
+  if (activePage === "all") return groups;
+  return groups.filter((group) => group.id === activePage);
 }
 
 function createTokenCard(group: TokenGroup) {
@@ -398,16 +451,6 @@ function createTokenCard(group: TokenGroup) {
     header.setAttribute("aria-expanded", String(!collapsed));
   });
   return card;
-}
-
-function collapseAllExcept(root: ParentNode, expandedGroupId: string) {
-  for (const card of root.querySelectorAll<HTMLElement>("[data-token-group]")) {
-    const expanded = card.dataset.tokenGroup === expandedGroupId;
-    card.classList.toggle("is-collapsed", !expanded);
-    card
-      .querySelector<HTMLButtonElement>(".nb-token-card__header")
-      ?.setAttribute("aria-expanded", String(expanded));
-  }
 }
 
 function createTokenRow(
