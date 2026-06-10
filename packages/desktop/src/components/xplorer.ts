@@ -299,6 +299,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
         getActions(event) {
           const context = contextForEvent(event);
           activeContext = context;
+
           if (!context) return [];
           return contextMenuActions(context);
         },
@@ -306,6 +307,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
         async runAction(actionId, event) {
           const context = activeContext ?? contextForEvent(event);
           activeContext = undefined;
+ 
           if (!context) return;
 
           if (isBaseContextMenuAction(actionId)) {
@@ -456,16 +458,21 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   }
 
   async function deleteItem(node: XplorerNode) {
-    // TODO: Implement modal for this confirm message, add checkbox to show again that can be toggled off, in settings can toggle it back on...
+    // TODO: Abstract into modal message, 'show again' checkbox to toggle seeing this confirm modal, and when toggled off can open settings to toggle back on
     const message =
       node.kind === "folder"
         ? `Move ${node.name} and its contents to Trash?`
         : `Move ${node.name} to Trash?`;
 
     try {
+      const trashPath = await window.spaces.deleteItem(node.id);
       removeNodeFromTree(node);
       await loadSpaceItems();
     } catch (error) {
+      console.error("[xplorer:deleteItem] failed", {
+        node,
+        error,
+      });
       showError(error);
     }
   }

@@ -188,16 +188,20 @@ function assertActiveSpaceItemPath(itemPath: string) {
 async function trashItem(itemPath: string) {
   if (!activeSpacePath) throw new Error("Please select a space");
 
-  const trashPath = path.join(path.resolve(activeSpacePath), ".nb", "Trash");
+  const trashPath = path.join(path.resolve(activeSpacePath), ".nb", "trash");
   const relative = path.relative(trashPath, itemPath);
   if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
     throw new Error("Item is already in Trash.");
   }
 
+  const sourceBefore = await statSummary(itemPath);
+
   await fs.mkdir(trashPath, { recursive: true });
   const target = await availableTrashPath(trashPath, path.basename(itemPath));
+
   await moveToTrash(itemPath, target);
   const sourceAfter = await statSummary(itemPath);
+  const targetAfter = await statSummary(target);
 
   if (sourceAfter.exists) {
     throw new Error(`Could not move item to Trash: ${itemPath}`);
