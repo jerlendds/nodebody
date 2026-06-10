@@ -366,13 +366,126 @@ export function createWebProjectPreview(
         const styleGrid = el("div", "nb-web-project__style-grid");
         for (const property of editableStyleProperties) {
           const label = el("label", "nb-web-project__style-field");
+          if (isLongStyleProperty(property)) {
+            label.classList.add("nb-web-project__style-field--wide");
+          }
           const name = el("span", "nb-web-project__style-name", property);
+          const control = el("div", "nb-web-project__style-control");
           const input = el("input", "nb-web-project__style-input") as HTMLInputElement;
           input.value = selectedElement.computedStyle[property] ?? "";
           input.addEventListener("change", () => {
             void patchSelectedCss(property, input.value);
           });
-          label.append(name, input);
+          control.append(input);
+
+          if (isColorStyleProperty(property) && parseColorOrUndefined(input.value)) {
+            const swatch = el(
+              "button",
+              "nb-web-project__color-swatch",
+            ) as HTMLButtonElement;
+            const popover = el("div", "nb-web-project__color-popover");
+            let pickerReady = false;
+            let colorPatchTimer: number | undefined;
+            swatch.type = "button";
+            swatch.style.background = input.value;
+            popover.hidden = true;
+            const picker = new ColorPicker(popover, {
+              initial: input.value,
+              onChange(color) {
+                if (!pickerReady) return;
+                input.value = color.css;
+                swatch.style.background = color.css;
+                if (colorPatchTimer !== undefined) {
+                  window.clearTimeout(colorPatchTimer);
+                }
+                colorPatchTimer = window.setTimeout(() => {
+                  void patchSelectedCss(property, color.css);
+                }, 120);
+              },
+            });
+            pickerReady = true;
+            swatch.addEventListener("click", (event) => {
+              event.preventDefault();
+              popover.hidden = !popover.hidden;
+            });
+            input.addEventListener("change", () => {
+              const parsed = parseColorOrUndefined(input.value);
+              if (!parsed) return;
+              picker.setColor(input.value);
+              swatch.style.background = input.value;
+            });
+            control.append(swatch, popover);
+          }
+
+          if (isGradientStyleProperty(property)) {
+            const gradient = parseLinearGradient(input.value);
+            if (gradient) {
+              label.classList.add("nb-web-project__style-field--gradient-row");
+              input.classList.add("nb-web-project__style-input--gradient-raw");
+              control.classList.add("nb-web-project__style-control--gradient");
+              const summary = el(
+                "button",
+                "nb-web-project__gradient-summary",
+                gradientLabel(gradient),
+              ) as HTMLButtonElement;
+              const swatch = el(
+                "button",
+                "nb-web-project__gradient-swatch",
+              ) as HTMLButtonElement;
+              const popover = el("div", "nb-web-project__gradient-popover");
+              let gradientPatchTimer: number | undefined;
+              summary.type = "button";
+              swatch.type = "button";
+              swatch.style.background = linearGradientToCss(gradient);
+              popover.hidden = true;
+              new GradientEditor(popover, {
+                initial: gradient,
+                onClose() {
+                  popover.hidden = true;
+                },
+                onChange(next) {
+                  input.value = linearGradientToCss(next);
+                  summary.textContent = gradientLabel(next);
+                  swatch.style.background = input.value;
+                  if (gradientPatchTimer !== undefined) {
+                    window.clearTimeout(gradientPatchTimer);
+                  }
+                  gradientPatchTimer = window.setTimeout(() => {
+                    void patchSelectedCss(property, input.value);
+                  }, 140);
+                },
+              });
+              input.addEventListener("change", () => {
+                const parsed = parseLinearGradient(input.value);
+                if (!parsed) return;
+                swatch.style.background = linearGradientToCss(parsed);
+                popover.replaceChildren();
+                new GradientEditor(popover, {
+                  initial: parsed,
+                  onClose() {
+                    popover.hidden = true;
+                  },
+                  onChange(next) {
+                    input.value = linearGradientToCss(next);
+                    summary.textContent = gradientLabel(next);
+                    swatch.style.background = input.value;
+                    void patchSelectedCss(property, input.value);
+                  },
+                });
+              });
+              summary.addEventListener("click", (event) => {
+                event.preventDefault();
+                popover.hidden = !popover.hidden;
+              });
+              swatch.addEventListener("click", (event) => {
+                event.preventDefault();
+                popover.hidden = !popover.hidden;
+              });
+              control.append(summary, swatch, popover);
+            }
+          }
+
+          label.append(name, control);
           styleGrid.append(label);
         }
         styleSection.append(styleTitle, styleGrid);
@@ -423,18 +536,482 @@ const editableStyleProperties = [
   "margin",
   "padding",
   "color",
+  "background",
+  "backgroundImage",
   "backgroundColor",
   "fontSize",
   "fontWeight",
   "lineHeight",
   "borderRadius",
   "border",
+  "borderColor",
   "gap",
   "flexDirection",
   "alignItems",
   "justifyContent",
   "gridTemplateColumns",
 ];
+
+type RGBA = {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+};
+
+type HSVA = {
+  h: number;
+  s: number;
+  v: number;
+  a: number;
+};
+
+type ColorPickerOptions = {
+  initial?: string;
+  onChange?: (color: {
+    rgba: RGBA;
+    hsva: HSVA;
+    hex: string;
+    css: string;
+  }) => void;
+};
+
+type GradientStop = {
+  color: string;
+  position: number;
+};
+
+type LinearGradientValue = {
+  kind: "linear" | "radial";
+  angle: number;
+  radialPrefix: string;
+  stops: GradientStop[];
+};
+
+type GradientEditorOptions = {
+  initial: LinearGradientValue;
+  onClose?: () => void;
+  onChange?: (gradient: LinearGradientValue) => void;
+};
+
+class ColorPicker {
+  private root: HTMLElement;
+  private sv: HTMLDivElement;
+  private svHandle: HTMLDivElement;
+  private hue: HTMLDivElement;
+  private hueHandle: HTMLDivElement;
+  private alpha: HTMLDivElement;
+  private alphaFill: HTMLDivElement;
+  private alphaHandle: HTMLDivElement;
+
+  private hsva: HSVA = {
+    h: 310,
+    s: 0.75,
+    v: 0.9,
+    a: 0.75,
+  };
+
+  private onChange?: ColorPickerOptions["onChange"];
+
+  constructor(container: HTMLElement, options: ColorPickerOptions = {}) {
+    this.onChange = options.onChange;
+
+    if (options.initial) {
+      this.hsva = rgbaToHsva(parseColor(options.initial));
+    }
+
+    this.root = document.createElement("div");
+    this.root.className = "cp";
+
+    this.sv = document.createElement("div");
+    this.sv.className = "cp-sv";
+
+    this.svHandle = document.createElement("div");
+    this.svHandle.className = "cp-handle cp-sv-handle";
+    this.sv.appendChild(this.svHandle);
+
+    this.hue = document.createElement("div");
+    this.hue.className = "cp-hue";
+
+    this.hueHandle = document.createElement("div");
+    this.hueHandle.className = "cp-handle cp-hue-handle";
+    this.hue.appendChild(this.hueHandle);
+
+    this.alpha = document.createElement("div");
+    this.alpha.className = "cp-alpha";
+
+    this.alphaFill = document.createElement("div");
+    this.alphaFill.className = "cp-alpha-fill";
+
+    this.alphaHandle = document.createElement("div");
+    this.alphaHandle.className = "cp-handle cp-alpha-handle";
+
+    this.alpha.append(this.alphaFill, this.alphaHandle);
+
+    this.root.append(this.sv, this.hue, this.alpha);
+    container.appendChild(this.root);
+
+    this.bindDrag(this.sv, this.setSV);
+    this.bindDrag(this.hue, this.setHue);
+    this.bindDrag(this.alpha, this.setAlpha);
+
+    this.render();
+    this.emit();
+  }
+
+  setColor(input: string) {
+    this.hsva = rgbaToHsva(parseColor(input));
+    this.render();
+    this.emit();
+  }
+
+  getColor() {
+    const rgba = hsvaToRgba(this.hsva);
+    return {
+      rgba,
+      hsva: { ...this.hsva },
+      hex: rgbaToHex(rgba),
+      css: rgbaToCss(rgba),
+    };
+  }
+
+  destroy() {
+    this.root.remove();
+  }
+
+  private setSV = (x: number, y: number, rect: DOMRect) => {
+    this.hsva.s = clamp(x / rect.width);
+    this.hsva.v = clamp(1 - y / rect.height);
+    this.render();
+    this.emit();
+  };
+
+  private setHue = (x: number, _y: number, rect: DOMRect) => {
+    this.hsva.h = clamp(x / rect.width) * 360;
+    this.render();
+    this.emit();
+  };
+
+  private setAlpha = (x: number, _y: number, rect: DOMRect) => {
+    this.hsva.a = clamp(x / rect.width);
+    this.render();
+    this.emit();
+  };
+
+  private bindDrag(
+    element: HTMLElement,
+    handler: (x: number, y: number, rect: DOMRect) => void,
+  ) {
+    const move = (event: PointerEvent) => {
+      const rect = element.getBoundingClientRect();
+      handler(event.clientX - rect.left, event.clientY - rect.top, rect);
+    };
+
+    element.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      element.setPointerCapture(event.pointerId);
+      move(event);
+
+      const onMove = (moveEvent: PointerEvent) => move(moveEvent);
+      const onUp = () => {
+        element.removeEventListener("pointermove", onMove);
+        element.removeEventListener("pointerup", onUp);
+        element.removeEventListener("pointercancel", onUp);
+      };
+
+      element.addEventListener("pointermove", onMove);
+      element.addEventListener("pointerup", onUp);
+      element.addEventListener("pointercancel", onUp);
+    });
+  }
+
+  private render() {
+    const { h, s, v, a } = this.hsva;
+    const hueColor = `hsl(${h} 100% 50%)`;
+    const opaque = hsvaToRgba({ h, s, v, a: 1 });
+
+    this.sv.style.background = `
+      linear-gradient(to top, black, transparent),
+      linear-gradient(to right, white, transparent),
+      ${hueColor}
+    `;
+
+    this.svHandle.style.left = `${s * 100}%`;
+    this.svHandle.style.top = `${(1 - v) * 100}%`;
+
+    this.hueHandle.style.left = `${(h / 360) * 100}%`;
+
+    this.alphaFill.style.background = `
+      linear-gradient(
+        to right,
+        rgba(${opaque.r}, ${opaque.g}, ${opaque.b}, 0),
+        rgba(${opaque.r}, ${opaque.g}, ${opaque.b}, 1)
+      )
+    `;
+
+    this.alphaHandle.style.left = `${a * 100}%`;
+  }
+
+  private emit() {
+    this.onChange?.(this.getColor());
+  }
+}
+
+class GradientEditor {
+  private root: HTMLElement;
+  private preview: HTMLDivElement;
+  private stopsList: HTMLDivElement;
+  private angleInput: HTMLInputElement;
+  private gradient: LinearGradientValue;
+  private onClose?: GradientEditorOptions["onClose"];
+  private onChange?: GradientEditorOptions["onChange"];
+
+  constructor(container: HTMLElement, options: GradientEditorOptions) {
+    this.gradient = cloneGradient(options.initial);
+    this.onClose = options.onClose;
+    this.onChange = options.onChange;
+
+    this.root = document.createElement("div");
+    this.root.className = "ge";
+
+    const titlebar = document.createElement("div");
+    titlebar.className = "ge-titlebar";
+    const title = document.createElement("div");
+    title.className = "ge-title";
+    title.textContent = "Gradient";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "ge-icon-button";
+    close.textContent = "x";
+    titlebar.append(title, close);
+
+    const header = document.createElement("div");
+    header.className = "ge-header";
+
+    const type = document.createElement("select");
+    type.className = "ge-select";
+    const linear = document.createElement("option");
+    linear.value = "linear";
+    linear.textContent = "Linear";
+    const radial = document.createElement("option");
+    radial.value = "radial";
+    radial.textContent = "Radial";
+    type.append(linear, radial);
+    type.value = this.gradient.kind;
+
+    const angleWrap = document.createElement("label");
+    angleWrap.className = "ge-angle";
+    this.angleInput = document.createElement("input");
+    this.angleInput.type = "number";
+    this.angleInput.min = "0";
+    this.angleInput.max = "360";
+    this.angleInput.step = "1";
+    this.angleInput.value = String(Math.round(this.gradient.angle));
+    this.angleInput.disabled = this.gradient.kind === "radial";
+    const angleUnit = document.createElement("span");
+    angleUnit.textContent = "deg";
+    angleWrap.append(this.angleInput, angleUnit);
+
+    header.append(type, angleWrap);
+
+    this.preview = document.createElement("div");
+    this.preview.className = "ge-preview";
+
+    const stopsHeader = document.createElement("div");
+    stopsHeader.className = "ge-stops-header";
+    const stopsLabel = document.createElement("span");
+    stopsLabel.textContent = "Stops";
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "ge-add";
+    add.textContent = "+";
+    stopsHeader.append(stopsLabel, add);
+
+    this.stopsList = document.createElement("div");
+    this.stopsList.className = "ge-stops";
+
+    this.root.append(titlebar, header, this.preview, stopsHeader, this.stopsList);
+    container.append(this.root);
+
+    close.addEventListener("click", () => this.onClose?.());
+
+    type.addEventListener("change", () => {
+      this.gradient.kind = type.value === "radial" ? "radial" : "linear";
+      this.angleInput.disabled = this.gradient.kind === "radial";
+      this.render();
+      this.emit();
+    });
+
+    this.angleInput.addEventListener("change", () => {
+      this.gradient.angle = normalizeDegrees(Number(this.angleInput.value));
+      this.render();
+      this.emit();
+    });
+
+    add.addEventListener("click", () => {
+      this.gradient.stops.push({
+        color: "#ffffff",
+        position: midpointStopPosition(this.gradient.stops),
+      });
+      this.sortStops();
+      this.render();
+      this.emit();
+    });
+
+    this.render();
+  }
+
+  private render() {
+    this.sortStops();
+    this.preview.style.background = linearGradientToCss(this.gradient);
+    this.preview.replaceChildren();
+    this.stopsList.replaceChildren();
+
+    this.gradient.stops.forEach((stop, index) => {
+      const handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "ge-preview-stop";
+      handle.style.left = `${stop.position}%`;
+      handle.style.background = stop.color;
+      this.bindStopDrag(handle, stop);
+      this.preview.append(handle);
+
+      const row = document.createElement("div");
+      row.className = "ge-stop";
+
+      const position = document.createElement("input");
+      position.className = "ge-stop-position";
+      position.type = "number";
+      position.min = "0";
+      position.max = "100";
+      position.step = "1";
+      position.value = String(Math.round(stop.position));
+
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "ge-stop-swatch";
+      swatch.style.background = stop.color;
+
+      const color = document.createElement("input");
+      color.className = "ge-stop-color";
+      color.value = colorInputValue(stop.color);
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "ge-remove";
+      remove.textContent = "-";
+      remove.disabled = this.gradient.stops.length <= 2;
+
+      const pickerHost = document.createElement("div");
+      pickerHost.className = "nb-web-project__color-popover ge-color-popover";
+      pickerHost.hidden = true;
+      let pickerReady = false;
+      if (parseColorOrUndefined(stop.color)) {
+        new ColorPicker(pickerHost, {
+          initial: stop.color,
+          onChange: (nextColor) => {
+            if (!pickerReady) return;
+            stop.color = nextColor.css;
+            color.value = colorInputValue(nextColor.css);
+            swatch.style.background = nextColor.css;
+            this.renderPreviewOnly();
+            this.emit();
+          },
+        });
+        pickerReady = true;
+      }
+
+      swatch.addEventListener("click", (event) => {
+        event.preventDefault();
+        pickerHost.hidden = !pickerHost.hidden;
+      });
+
+      color.addEventListener("change", () => {
+        const nextColor = normalizeColorInput(color.value);
+        if (!nextColor) return;
+        stop.color = nextColor;
+        color.value = colorInputValue(nextColor);
+        this.render();
+        this.emit();
+      });
+
+      position.addEventListener("change", () => {
+        stop.position = clamp(Number(position.value), 0, 100);
+        this.render();
+        this.emit();
+      });
+
+      remove.addEventListener("click", () => {
+        this.gradient.stops.splice(index, 1);
+        this.render();
+        this.emit();
+      });
+
+      const opacity = document.createElement("input");
+      opacity.className = "ge-stop-opacity";
+      opacity.type = "number";
+      opacity.min = "0";
+      opacity.max = "100";
+      opacity.step = "1";
+      opacity.value = String(Math.round((parseColorOrUndefined(stop.color)?.a ?? 1) * 100));
+
+      opacity.addEventListener("change", () => {
+        const parsed = parseColorOrUndefined(stop.color);
+        if (!parsed) return;
+        stop.color = rgbaToCss({
+          ...parsed,
+          a: clamp(Number(opacity.value), 0, 100) / 100,
+        });
+        this.render();
+        this.emit();
+      });
+
+      row.append(position, swatch, color, opacity, remove, pickerHost);
+      this.stopsList.append(row);
+    });
+  }
+
+  private renderPreviewOnly() {
+    this.preview.style.background = linearGradientToCss(this.gradient);
+  }
+
+  private bindStopDrag(handle: HTMLElement, stop: GradientStop) {
+    const move = (event: PointerEvent) => {
+      const rect = this.preview.getBoundingClientRect();
+      stop.position = clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
+      handle.style.left = `${stop.position}%`;
+      this.renderPreviewOnly();
+      this.emit();
+    };
+
+    handle.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handle.setPointerCapture(event.pointerId);
+      handle.classList.add("is-dragging");
+      move(event);
+      const onMove = (moveEvent: PointerEvent) => move(moveEvent);
+      const onUp = () => {
+        handle.classList.remove("is-dragging");
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
+        this.render();
+      };
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onUp);
+    });
+  }
+
+  private sortStops() {
+    this.gradient.stops.sort((a, b) => a.position - b.position);
+  }
+
+  private emit() {
+    this.onChange?.(cloneGradient(this.gradient));
+  }
+}
 
 async function readProjectState(rootPath: string): Promise<ProjectState> {
   const items = await window.spaces.items();
@@ -640,6 +1217,18 @@ function finiteNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function isColorStyleProperty(property: string) {
+  return colorStyleProperties.has(property);
+}
+
+function isLongStyleProperty(property: string) {
+  return longStyleProperties.has(property);
+}
+
+function isGradientStyleProperty(property: string) {
+  return gradientStyleProperties.has(property);
+}
+
 function elementLabel(payload: InspectedElementPayload) {
   const id = payload.id ? `#${payload.id}` : "";
   const classes = payload.classList.slice(0, 3).map((item) => `.${item}`).join("");
@@ -735,4 +1324,323 @@ function isPathInside(rootPath: string, filePath: string) {
   const root = normalizePath(rootPath).replace(/\/$/, "");
   const file = normalizePath(filePath);
   return file === root || file.startsWith(`${root}/`);
+}
+
+const colorStyleProperties = new Set(["color", "backgroundColor", "borderColor"]);
+const gradientStyleProperties = new Set(["background", "backgroundImage"]);
+const longStyleProperties = new Set(["background", "backgroundImage", "border"]);
+
+function parseLinearGradient(input: string): LinearGradientValue | undefined {
+  const value = input.trim();
+  const match = value.match(/^(linear|radial)-gradient\(([\s\S]*)\)$/i);
+  if (!match) return undefined;
+
+  const kind = match[1].toLowerCase() === "radial" ? "radial" : "linear";
+  const parts = splitTopLevelCommas(match[2]).map((part) => part.trim());
+  if (parts.length < 2) return undefined;
+
+  let angle = 180;
+  let radialPrefix = "circle";
+  let stopParts = parts;
+  const first = parts[0];
+  if (kind === "linear") {
+    const angleMatch = first.match(/^(-?[\d.]+)deg$/i);
+    if (angleMatch) {
+      angle = normalizeDegrees(Number(angleMatch[1]));
+      stopParts = parts.slice(1);
+    } else if (first.toLowerCase().startsWith("to ")) {
+      angle = directionToDegrees(first);
+      stopParts = parts.slice(1);
+    }
+  } else if (!parseGradientStop(first, 0, parts.length)) {
+    radialPrefix = first || radialPrefix;
+    stopParts = parts.slice(1);
+  }
+
+  const stops = stopParts
+    .map((part, index) => parseGradientStop(part, index, stopParts.length))
+    .filter((stop): stop is GradientStop => Boolean(stop));
+  if (stops.length < 2) return undefined;
+  return { kind, angle, radialPrefix, stops };
+}
+
+function parseGradientStop(
+  input: string,
+  index: number,
+  stopCount: number,
+): GradientStop | undefined {
+  const tokens = splitWhitespaceOutsideFunctions(input);
+  if (!tokens.length) return undefined;
+  const last = tokens[tokens.length - 1];
+  const percentMatch = last.match(/^(-?[\d.]+)%$/);
+  const position = percentMatch
+    ? clamp(Number(percentMatch[1]), 0, 100)
+    : stopCount <= 1
+      ? 0
+      : (index / (stopCount - 1)) * 100;
+  const color = percentMatch ? tokens.slice(0, -1).join(" ") : input;
+  if (!parseColorOrUndefined(color.trim())) return undefined;
+  return {
+    color: color.trim(),
+    position,
+  };
+}
+
+function linearGradientToCss(gradient: LinearGradientValue) {
+  const stops = gradient.stops
+    .slice()
+    .sort((a, b) => a.position - b.position)
+    .map((stop) => `${stop.color} ${Math.round(stop.position)}%`)
+    .join(", ");
+  if (gradient.kind === "radial") {
+    return `radial-gradient(${gradient.radialPrefix || "circle"}, ${stops})`;
+  }
+  return `linear-gradient(${Math.round(normalizeDegrees(gradient.angle))}deg, ${stops})`;
+}
+
+function gradientLabel(gradient: LinearGradientValue) {
+  return gradient.kind === "radial" ? "Radial" : "Linear";
+}
+
+function splitTopLevelCommas(input: string) {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const character of input) {
+    if (character === "(") depth += 1;
+    else if (character === ")") depth = Math.max(0, depth - 1);
+
+    if (character === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += character;
+    }
+  }
+  if (current.trim()) parts.push(current);
+  return parts;
+}
+
+function splitWhitespaceOutsideFunctions(input: string) {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const character of input.trim()) {
+    if (character === "(") depth += 1;
+    else if (character === ")") depth = Math.max(0, depth - 1);
+
+    if (/\s/.test(character) && depth === 0) {
+      if (current) {
+        parts.push(current);
+        current = "";
+      }
+    } else {
+      current += character;
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+function directionToDegrees(direction: string) {
+  switch (direction.toLowerCase()) {
+    case "to top":
+      return 0;
+    case "to top right":
+    case "to right top":
+      return 45;
+    case "to right":
+      return 90;
+    case "to bottom right":
+    case "to right bottom":
+      return 135;
+    case "to bottom":
+      return 180;
+    case "to bottom left":
+    case "to left bottom":
+      return 225;
+    case "to left":
+      return 270;
+    case "to top left":
+    case "to left top":
+      return 315;
+    default:
+      return 180;
+  }
+}
+
+function normalizeDegrees(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return ((value % 360) + 360) % 360;
+}
+
+function cloneGradient(gradient: LinearGradientValue): LinearGradientValue {
+  return {
+    kind: gradient.kind,
+    angle: gradient.angle,
+    radialPrefix: gradient.radialPrefix,
+    stops: gradient.stops.map((stop) => ({ ...stop })),
+  };
+}
+
+function midpointStopPosition(stops: readonly GradientStop[]) {
+  if (stops.length < 2) return 50;
+  const sorted = stops.slice().sort((a, b) => a.position - b.position);
+  let widestStart = sorted[0];
+  let widestEnd = sorted[1];
+  for (let index = 1; index < sorted.length - 1; index += 1) {
+    const start = sorted[index];
+    const end = sorted[index + 1];
+    if (end.position - start.position > widestEnd.position - widestStart.position) {
+      widestStart = start;
+      widestEnd = end;
+    }
+  }
+  return Math.round((widestStart.position + widestEnd.position) / 2);
+}
+
+function clamp(value: number, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function hsvaToRgba({ h, s, v, a }: HSVA): RGBA {
+  const normalizedHue = ((h % 360) + 360) % 360;
+  const c = v * s;
+  const x = c * (1 - Math.abs(((normalizedHue / 60) % 2) - 1));
+  const m = v - c;
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (normalizedHue < 60) [r, g, b] = [c, x, 0];
+  else if (normalizedHue < 120) [r, g, b] = [x, c, 0];
+  else if (normalizedHue < 180) [r, g, b] = [0, c, x];
+  else if (normalizedHue < 240) [r, g, b] = [0, x, c];
+  else if (normalizedHue < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+
+  return {
+    r: Math.round((r + m) * 255),
+    g: Math.round((g + m) * 255),
+    b: Math.round((b + m) * 255),
+    a: Number(a.toFixed(3)),
+  };
+}
+
+function rgbaToHsva({ r, g, b, a }: RGBA): HSVA {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const delta = max - min;
+
+  let h = 0;
+
+  if (delta !== 0) {
+    if (max === rn) h = 60 * (((gn - bn) / delta) % 6);
+    else if (max === gn) h = 60 * ((bn - rn) / delta + 2);
+    else h = 60 * ((rn - gn) / delta + 4);
+  }
+
+  if (h < 0) h += 360;
+
+  return {
+    h,
+    s: max === 0 ? 0 : delta / max,
+    v: max,
+    a,
+  };
+}
+
+function rgbaToHex({ r, g, b, a }: RGBA) {
+  const toHex = (value: number) => value.toString(16).padStart(2, "0");
+  const alpha = Math.round(a * 255);
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}${
+    alpha < 255 ? toHex(alpha) : ""
+  }`;
+}
+
+function rgbaToCss({ r, g, b, a }: RGBA) {
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+function colorInputValue(input: string) {
+  const parsed = parseColorOrUndefined(input);
+  if (!parsed) return input;
+  return rgbaToHex(parsed).replace(/^#/, "").toUpperCase();
+}
+
+function normalizeColorInput(input: string) {
+  const value = input.trim();
+  if (/^[0-9a-fA-F]{3,8}$/.test(value)) return `#${value}`;
+  return parseColorOrUndefined(value) ? value : undefined;
+}
+
+function parseColorOrUndefined(input: string) {
+  try {
+    return parseColor(input);
+  } catch {
+    return undefined;
+  }
+}
+
+function parseColor(input: string): RGBA {
+  const rawValue = input.trim();
+  const value = /^[0-9a-fA-F]{3,8}$/.test(rawValue)
+    ? `#${rawValue}`
+    : rawValue;
+
+  if (value.startsWith("#")) {
+    const hex = value.slice(1);
+
+    if (![3, 4, 6, 8].includes(hex.length)) {
+      throw new Error("Invalid hex color.");
+    }
+
+    const normalized =
+      hex.length <= 4
+        ? hex
+            .split("")
+            .map((character) => character + character)
+            .join("")
+        : hex;
+
+    const r = parseInt(normalized.slice(0, 2), 16);
+    const g = parseInt(normalized.slice(2, 4), 16);
+    const b = parseInt(normalized.slice(4, 6), 16);
+    const a =
+      normalized.length === 8
+        ? parseInt(normalized.slice(6, 8), 16) / 255
+        : 1;
+
+    if ([r, g, b, a].some((channel) => Number.isNaN(channel))) {
+      throw new Error("Invalid hex color.");
+    }
+
+    return {
+      r: clamp(Math.round(r), 0, 255),
+      g: clamp(Math.round(g), 0, 255),
+      b: clamp(Math.round(b), 0, 255),
+      a: clamp(a),
+    };
+  }
+
+  const rgbaMatch = value.match(
+    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/,
+  );
+
+  if (rgbaMatch) {
+    return {
+      r: clamp(Math.round(Number(rgbaMatch[1])), 0, 255),
+      g: clamp(Math.round(Number(rgbaMatch[2])), 0, 255),
+      b: clamp(Math.round(Number(rgbaMatch[3])), 0, 255),
+      a: rgbaMatch[4] === undefined ? 1 : clamp(Number(rgbaMatch[4])),
+    };
+  }
+
+  throw new Error("Unsupported color format.");
 }

@@ -41,6 +41,7 @@ interface Space {
   name: string;
   path: string;
   displayPath: string;
+  xplorerOpen?: boolean;
   xplorerExpandedIds?: string[];
 }
 
@@ -57,6 +58,7 @@ interface SpacesApi {
   selected: () => Promise<Space | undefined>;
   items: () => Promise<SpaceItem[]>;
   setXplorerExpandedIds: (ids: string[]) => Promise<void>;
+  setXplorerOpen: (open: boolean) => Promise<void>;
   readItem: (itemPath: string) => Promise<string>;
   readItemDataUrl: (itemPath: string) => Promise<string>;
   relativeItemPath: (itemPath: string) => Promise<string>;

@@ -7,6 +7,7 @@ import {
   readSpacesStore,
   selectSpace,
   updateSpaceXplorerExpandedIds,
+  updateSpaceXplorerOpen,
   type Space,
 } from "../utils";
 
@@ -32,8 +33,9 @@ export function registerSpacesIpc() {
 
   ipcMain.handle("spaces:selected", async () => {
     const store = await readSpacesStore();
+    const selectedSpacePath = await getActiveSpacePath();
     const selected = store.spaces.find(
-      (space) => space.path === activeSpacePath,
+      (space) => space.path === selectedSpacePath,
     );
     return selected ? withDisplayPath(selected) : undefined;
   });
@@ -51,27 +53,38 @@ export function registerSpacesIpc() {
   });
 
   ipcMain.handle("spaces:items", async () => {
-    if (!activeSpacePath) return [];
-    return listSpaceItems(activeSpacePath);
+    const spacePath = await getActiveSpacePath();
+    if (!spacePath) return [];
+    return listSpaceItems(spacePath);
   });
 
   ipcMain.handle("spaces:setXplorerExpandedIds", async (_event, ids: string[]) => {
-    if (!activeSpacePath) return;
-    await updateSpaceXplorerExpandedIds(activeSpacePath, ids);
+    const spacePath = await getActiveSpacePath();
+    if (!spacePath) return;
+    await updateSpaceXplorerExpandedIds(spacePath, ids);
+  });
+
+  ipcMain.handle("spaces:setXplorerOpen", async (_event, open: boolean) => {
+    const spacePath = await getActiveSpacePath();
+    if (!spacePath) return;
+    await updateSpaceXplorerOpen(spacePath, Boolean(open));
   });
 
   ipcMain.handle("spaces:readItem", async (_event, itemPath: string) => {
+    await getActiveSpacePath();
     const resolved = assertActiveSpaceItemPath(itemPath);
     return fs.readFile(resolved, "utf8");
   });
 
   ipcMain.handle("spaces:readItemDataUrl", async (_event, itemPath: string) => {
+    await getActiveSpacePath();
     const resolved = assertActiveSpaceItemPath(itemPath);
     const data = await fs.readFile(resolved);
     return `data:${mimeTypeForPath(resolved)};base64,${data.toString("base64")}`;
   });
 
   ipcMain.handle("spaces:relativeItemPath", async (_event, itemPath: string) => {
+    await getActiveSpacePath();
     const resolved = assertActiveSpaceItemPath(itemPath);
     return path.relative(path.resolve(activeSpacePath!), resolved);
   });
@@ -79,6 +92,7 @@ export function registerSpacesIpc() {
   ipcMain.handle(
     "spaces:createFile",
     async (_event, parentPath: string, name: string) => {
+      await getActiveSpacePath();
       const parent = assertActiveSpaceItemPath(parentPath);
       await assertDirectory(parent);
       const filePath = childPath(parent, name);
@@ -90,6 +104,7 @@ export function registerSpacesIpc() {
   ipcMain.handle(
     "spaces:createFolder",
     async (_event, parentPath: string, name: string) => {
+      await getActiveSpacePath();
       const parent = assertActiveSpaceItemPath(parentPath);
       await assertDirectory(parent);
       const folderPath = childPath(parent, name);
@@ -101,6 +116,7 @@ export function registerSpacesIpc() {
   ipcMain.handle(
     "spaces:createWebFolder",
     async (_event, parentPath: string, name: string) => {
+      await getActiveSpacePath();
       const parent = assertActiveSpaceItemPath(parentPath);
       await assertDirectory(parent);
       const folderPath = childPath(parent, name);
@@ -141,6 +157,7 @@ export function registerSpacesIpc() {
   ipcMain.handle(
     "spaces:renameItem",
     async (_event, itemPath: string, name: string) => {
+      await getActiveSpacePath();
       const resolved = assertActiveSpaceItemPath(itemPath);
       const target = childPath(path.dirname(resolved), name);
       assertActiveSpaceItemPath(target);
@@ -152,6 +169,7 @@ export function registerSpacesIpc() {
 
   ipcMain.handle("spaces:deleteItem", async (_event, itemPath: string) => {
     try {
+      await getActiveSpacePath();
       const resolved = assertActiveSpaceItemPath(itemPath);
       const target = await trashItem(resolved);
       return target;
@@ -168,10 +186,22 @@ export function registerSpacesIpc() {
   ipcMain.handle(
     "spaces:writeItem",
     async (_event, itemPath: string, value: string) => {
+      await getActiveSpacePath();
       const resolved = assertActiveSpaceItemPath(itemPath);
       await fs.writeFile(resolved, value, "utf8");
     },
   );
+}
+
+async function getActiveSpacePath() {
+  if (activeSpacePath) return activeSpacePath;
+
+  const store = await readSpacesStore();
+  const selected = store.spaces.find(
+    (space) => space.path === store.selectedSpacePath,
+  );
+  activeSpacePath = selected?.path;
+  return activeSpacePath;
 }
 
 function withDisplayPath(space: Space): DisplaySpace {

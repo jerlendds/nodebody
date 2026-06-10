@@ -172,6 +172,7 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           if (activity === "xplorer") {
             const nextOpen = !isXplorerOpen.get();
             isXplorerOpen.set(nextOpen);
+            void window.spaces.setXplorerOpen(nextOpen);
             activeActivity.set(nextOpen ? activity : "home");
             return;
           }
@@ -245,6 +246,8 @@ export function workbench(options: WorkbenchOptions = {}): Component {
           );
         }),
       );
+
+      void restoreXplorerOpenState();
 
       async function openSpaceFile(filePath: string, title: string) {
         if (isMarkdownFile(title)) {
@@ -511,6 +514,13 @@ export function workbench(options: WorkbenchOptions = {}): Component {
             activate: true,
           }),
         );
+      }
+
+      async function restoreXplorerOpenState() {
+        const selected = await window.spaces.selected();
+        if (!selected?.xplorerOpen) return;
+        isXplorerOpen.set(true);
+        activeActivity.set("xplorer");
       }
     },
   };

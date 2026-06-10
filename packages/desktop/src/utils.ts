@@ -6,6 +6,7 @@ import { app } from "electron";
 export interface Space {
   name: string;
   path: string;
+  xplorerOpen?: boolean;
   xplorerExpandedIds?: string[];
 }
 
@@ -121,6 +122,19 @@ export async function updateSpaceXplorerExpandedIds(
   });
 }
 
+export async function updateSpaceXplorerOpen(
+  spacePath: string,
+  xplorerOpen: boolean,
+) {
+  const store = await readSpacesStore();
+  await writeSpacesStore({
+    ...store,
+    spaces: store.spaces.map((space) =>
+      space.path === spacePath ? { ...space, xplorerOpen } : space,
+    ),
+  });
+}
+
 async function normalizeDirectoryPath(directoryPath: string) {
   const trimmed = directoryPath.trim();
   if (!trimmed) throw new Error("A directory path is required.");
@@ -164,6 +178,9 @@ function normalizeSpaces(value: unknown) {
     spaces.push({
       name: space.name,
       path: space.path,
+      ...(typeof space.xplorerOpen === "boolean"
+        ? { xplorerOpen: space.xplorerOpen }
+        : {}),
       xplorerExpandedIds: normalizeStringArray(space.xplorerExpandedIds),
     });
   }
