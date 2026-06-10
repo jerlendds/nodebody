@@ -83,7 +83,7 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   root.setAttribute("aria-hidden", "true");
 
   const header = el("div", "nb-xplorer__header");
-  header.append(el("span", "nb-xplorer__title", "Space Xplorer"));
+  header.append(el("span", "nb-xplorer__title", "Xplorer"));
 
   const tree = el("div", "nb-xplorer__tree");
   tree.setAttribute("role", "tree");
@@ -105,7 +105,10 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
   const renderTree = () => {
     const currentNodes = nodes.get();
     if (!currentNodes.length) {
-      if (pendingWebFolder && selectedSpaceRoot?.id === pendingWebFolder.parentId) {
+      if (
+        pendingWebFolder &&
+        selectedSpaceRoot?.id === pendingWebFolder.parentId
+      ) {
         tree.replaceChildren(renderPendingWebFolder(0));
         focusPendingWebFolderInput();
         return;
@@ -119,7 +122,10 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
       return;
     }
     const renderedNodes = currentNodes.map((node) => renderNode(node, 0));
-    if (pendingWebFolder && selectedSpaceRoot?.id === pendingWebFolder.parentId) {
+    if (
+      pendingWebFolder &&
+      selectedSpaceRoot?.id === pendingWebFolder.parentId
+    ) {
       renderedNodes.push(renderPendingWebFolder(0));
     }
     tree.replaceChildren(...renderedNodes);
@@ -427,7 +433,9 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
     return node ? { node, event } : undefined;
   }
 
-  function baseContextMenuActions(context: XplorerContext): ContextMenuAction[] {
+  function baseContextMenuActions(
+    context: XplorerContext,
+  ): ContextMenuAction[] {
     const { node } = context;
     if (context.root) {
       return [
@@ -553,7 +561,8 @@ export function createXplorer(options: XplorerOptions = {}, scope: Scope) {
         name,
       );
       pendingWebFolder = undefined;
-      if (selectedSpaceRoot?.id !== pending.parentId) expanded.add(pending.parentId);
+      if (selectedSpaceRoot?.id !== pending.parentId)
+        expanded.add(pending.parentId);
       expanded.add(folderPath);
       await persistExpanded();
       await loadSpaceItems();

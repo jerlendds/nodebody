@@ -538,6 +538,16 @@ export function createWebProjectPreview(
 
       async function patchSelectedCss(property: string, value: string) {
         if (!selectedElement || !latestBuild) return;
+        if (!isSafeCssDeclarationValue(value)) {
+          renderDiagnostics([
+            {
+              text: "Inspector style values cannot contain semicolons, braces, or control characters.",
+              location: "inspector",
+            },
+          ]);
+          return;
+        }
+
         const patch = pickCssPatchTarget(
           selectedElement,
           latestBuild.cssRules,
@@ -1267,7 +1277,7 @@ function sanitizeInspectedPayload(
 function sanitizeSource(
   source: InspectedElementPayload["source"],
 ): InspectedElementPayload["source"] | undefined {
-  if (!source || typeof source.file !== "string") return undefined;
+  if (!source || !isSafeVirtualPath(source.file)) return undefined;
   return {
     file: source.file.slice(0, 500),
     line: positiveInteger(source.line) ?? 1,
@@ -1317,6 +1327,19 @@ function positiveInteger(value: unknown) {
 
 function finiteNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function isSafeVirtualPath(value: unknown) {
+  if (typeof value !== "string") return false;
+  if (!value.startsWith("/") || value.length > 500) return false;
+  return !value
+    .replace(/\\/g, "/")
+    .split("/")
+    .some((segment) => segment === "..");
+}
+
+function isSafeCssDeclarationValue(value: string) {
+  return !/[;{}\u0000-\u001f\u007f]/.test(value);
 }
 
 function isColorStyleProperty(property: string) {
