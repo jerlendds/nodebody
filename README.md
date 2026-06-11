@@ -8,6 +8,7 @@ We're not ready for use yet, please return later...
 
 - [A Category Theory Approach to HCI](./papers/001_England-1.pdf)
 - [Ontologies in Human-Computer Interaction: A Systematic Literature Review](./papers/10.3233AO-210255.pdf)
+- [Compiled AI: Deterministic Code Generation for LLM-Based Workflow Automation](./papers/2604.05150v1.pdf)
 - [Design2Code: Benchmarking Multimodal Code Generation for Automated Front-End Engineering](./papers/2025.naacl-long.199.pdf)
 - [Sensecape: Enabling Multilevel Exploration and Sensemaking with Large Language Models](./papers/2305.11483v2.pdf)
 - [Generative AI for Product Design: Getting the Right Design and the Design Right](./papers/2306.01217v1.pdf)
