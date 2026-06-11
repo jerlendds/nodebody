@@ -185,8 +185,8 @@
 .nb-token-card {
   display: block;
   min-width: 0;
-  border: 1px solid #25283a;
-  border-radius: 6px;
+  border: 1px solid var(--nb-darkest);
+  border-radius: 10px;
   background: var(--nb-surface);
   overflow: hidden;
 }
@@ -199,7 +199,7 @@
   width: 100%;
   padding: 14px;
   border: 0;
-  border-bottom: 1px solid #25283a;
+  border-bottom: 1px solid var(--nb-darkest);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -209,7 +209,7 @@
 
 .nb-token-card__header:hover,
 .nb-token-card__header:focus-visible {
-  background: rgba(36, 38, 51, 0.42);
+  background: var(--nb-dim);
   outline: none;
 }
 
@@ -234,14 +234,14 @@
 .nb-token-card__title {
   grid-column: 2;
   color: var(--nb-bright);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .nb-token-card__description {
   grid-column: 2;
   margin: 0;
-  color: var(--nb-muted);
+  color: var(--nb-foreground);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -288,12 +288,12 @@
 
 .nb-token-row {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) minmax(112px, max-content);
+  grid-template-columns: 64px minmax(0, 1fr) minmax(112px, max-content);
   gap: 10px;
   align-items: center;
   min-height: 62px;
-  padding: 10px 14px;
-  border-bottom: 1px solid #202334;
+  padding: 0px 14px 0 0px;
+  border-bottom: 1px solid var(--nb-darkest);
 }
 
 .nb-token-row:last-child {
@@ -303,6 +303,7 @@
 .nb-token-row__body {
   display: grid;
   gap: 4px;
+  padding: 10px 0;
   min-width: 0;
 }
 
@@ -340,7 +341,7 @@
   min-width: 0;
   padding: 4px 6px;
   overflow: hidden;
-  border: 1px solid #25283a;
+  border: 1px solid var(--nb-darkest);
   border-radius: 4px;
   background: var(--nb-darkest);
   color: var(--nb-foreground);
@@ -374,10 +375,9 @@
 .nb-token-preview {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #30344a;
-  border-radius: 6px;
+  width: 100%;
+  height: 100%;
+  border-right: 1px solid var(--nb-darkest);
   background: var(--nb-darkest);
 }
 
@@ -477,7 +477,7 @@
   }
 
   .nb-token-row {
-    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-columns: 64px minmax(0, 1fr);
   }
 
   .nb-token-row__value {

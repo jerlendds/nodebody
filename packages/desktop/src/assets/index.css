@@ -32,7 +32,7 @@
   --nb-ink: #8d92ad;
   --nb-muted: #747891;
   --nb-subtle: #525468;
-  --nb-dim: #242633;
+  --nb-dim: #181b29;
   --nb-dark: #13151d;
   --nb-darkest: #101118;
   --nb-accent: #2a84f8;
@@ -88,6 +88,10 @@
 }
 
 .nb-workbench.is-xplorer-open {
+  --nb-xplorer-column-width: var(--nb-xplorer-width);
+}
+
+.nb-workbench.is-design-system-panel-open {
   --nb-xplorer-column-width: var(--nb-xplorer-width);
 }
 
