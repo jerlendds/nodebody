@@ -2,6 +2,8 @@
 IZ/
 # TODO: Build out browser 'copy component/styles/etc' extension...
 packages/web-extension/
+# TODO: Test out custom harnesses around multiple models...
+xperiments/
 
 
 # Logs
