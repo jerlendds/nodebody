@@ -70,6 +70,7 @@ import lightSvg from "../icons/light.svg?raw";
 import logoSvg from "../icons/logo.svg?raw";
 import messageBotSvg from "../icons/message-bot.svg?raw";
 import microphoneSvg from "../icons/microphone.svg?raw";
+import masksTheaterSvg from "../icons/masks-theater.svg?raw";
 import mindMapSvg from "../icons/mind-map.svg?raw";
 import minusSvg from "../icons/minus.svg?raw";
 import overviewPages4Svg from "../icons/overview-pages-4.svg?raw";
@@ -218,6 +219,7 @@ export const smsIcon = icon(smsSvg);
 export const spaceshipLaunchDocumentationIcon = icon(
   spaceshipLaunchDocumentationSvg,
 );
+export const maskTheaterIcon = icon(masksTheaterSvg);
 export const spacingHorizontalIcon = icon(spacingHorizontalSvg);
 export const stepLengthIcon = icon(stepLengthSvg);
 export const tagsIcon = icon(tagsSvg);
